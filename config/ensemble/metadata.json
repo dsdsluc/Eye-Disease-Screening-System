@@ -1,0 +1,6 @@
+{
+    "ensemble_method": "weighted_average",
+    "threshold_method": "optimized_qwk",
+    "weights_file": "best_weights.npy",
+    "thresholds_file": "best_thresholds.npy"
+}

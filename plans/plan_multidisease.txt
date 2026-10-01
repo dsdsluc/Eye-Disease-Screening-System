@@ -1,0 +1,247 @@
+FUNDAS_SYSTEM -- QUY TRINH TRIEN KHAI MULTI-DISEASE SCREENING
+NHU 1 CHUC NANG RIENG (KHONG GOP VAO LUONG DR CHINH)
+====================================================
+Ghi lai (2026-08-30) quy trinh dua model multi-disease (plans/plan.txt Phase
+2, plans/archetechture.txt muc 9) da train xong tren Colab vao he thong san
+xuat, theo huong nguoi dung yeu cau: trien khai nhu 1 TINH NANG DOC LAP,
+KHONG gop vao ket qua DR grading chinh (khac cach lam voi Image Quality
+Gatekeeper o Phase 1 -- xem muc 2 de biet ly do khac biet).
+
+
+0. HIEN TRANG (2026-08-30, xac nhan lai truoc khi viet plan nay)
+----------------------------------------------------------
+- models/multidisease/model_best.pth: DA CO, train tren Colab, tai ve lai
+  may local (xem plans/ggcolab.txt buoc cuoi). Doc checkpoint xac nhan:
+    val_accuracy = 0.6221 (~62.2%)
+    val_macro_f1 = 0.5811
+    epoch = 12 (best), backbone = seresnext50_32x4d
+    labels = [normal, diabetes, glaucoma, cataract, amd, hypertension,
+              myopia, other]  (8 lop, single-label -- xem canh bao muc 6)
+- config/multidisease/config.json: VAN CON LA PLACEHOLDER ("notes":
+  "Placeholder until scripts/train_multidisease.py runs and overwrites
+  this..."). Ly do: script train that su chay tren Colab (notebook rieng,
+  xem plans/ggcolab.txt), khong phai scripts/train_multidisease.py chay
+  local, nen doan code tu-ghi-lai-config o cuoi script (dong 193-206) chua
+  bao gio thuc thi. PHAI cap nhat tay truoc khi dung (muc 3.1).
+- inference/multidisease_model.py: da co (MultiDiseaseModel, load_
+  multidisease_model()) -- CHUA co engine wrapper (khac QualityEngine),
+  CHUA co endpoint trong inference/main.py, CHUA co bat ky tich hop web/
+  nao. Day la phan can lam trong ke hoach nay.
+- inference/config.py: da doc san MULTIDISEASE_CONFIG/MULTIDISEASE_
+  CHECKPOINT_PATH (dong 42-48) -- khong can sua file nay.
+
+
+1. VI SAO 62% CHUA DU DE LAM PHASE 3, NHUNG VAN DANG TRIEN KHAI NGAY
+----------------------------------------------------------
+plans/plan.txt Phase 3 (chuyen sau tung benh, xem lai vong 4) gia dinh se
+lam KHI can do chinh xac cao hon multi-label baseline. 62% accuracy /
+0.58 macro-F1 la thap hon nhieu so ensemble DR hien tai (20-model, QWK
+toi uu) -- KHONG du tin cay de dung nhu 1 ket qua chan doan chinh thuc.
+
+Quyet dinh cua nguoi dung (2026-08-30): thay vi cho toi khi co model chinh
+xac hon (Phase 3), TRIEN KHAI NGAY model hien co nhu 1 CHUC NANG RIENG,
+tach biet ro rang khoi luong DR grading chinh -- nguoi dung tu quyet dinh
+co dung tinh nang "sang loc thu nghiem" nay hay khong, thay vi de model
+yeu anh huong/lam nhieu quy trinh DR dang hoat dong tot. Phase 3 (tu train
+glaucoma/AMD chuyen biet) van con nguyen trong plan.txt, khong bi thay
+the -- co the chay song song sau nay va thay dan tinh nang nay.
+
+
+2. QUYET DINH THIET KE: "CHUC NANG RIENG" NGHIA LA GI, KHAC GATEKEEPER O DAU
+----------------------------------------------------------
+So sanh voi Image Quality Gatekeeper (Phase 1, archetechture.txt muc 10) --
+2 tinh nang ngoai-DR DA CO trong repo, nhung MO HINH TICH HOP khac nhau:
+
+  Quality gatekeeper (Phase 1)          Multi-disease (tinh nang nay)
+  ------------------------------------  ------------------------------------
+  Chay NGAM, TU DONG kem moi lan upload  Nguoi dung CHU DONG bam de chay
+  anh (route.ts goi song song /predict)  (nut rieng, khong tu dong)
+  Ket qua LUU CHUNG vao Scan record      Ket qua luu vao BANG RIENG, KHONG
+  (qualityLabel/qualityProbs tren Scan)  dong bo migration vao model Scan
+  Muc dich: canh bao/gate cho chinh      Muc dich: tinh nang bo sung/tham
+  luong DR (anh xau -> canh bao)          khao, KHONG anh huong luong DR
+  Do tin cay: 88.6% accuracy (QuickQual  Do tin cay: 62.2% accuracy, single-
+  cong bo, MCF-Net-grade)                label 8-way -- PHAI hien thi disclaimer
+
+Ly do tach bang/tach UI thay vi nhet them cot vao Scan nhu quality: (a) do
+chinh xac thap hon han DR/quality nen khong nen "an" no vao chung 1 luong
+tu dong -- nguoi dung can biet ro day la tinh nang thu nghiem rieng; (b)
+single-label 8-way tren toan bo anh KHONG bam theo cung thang do/ngu nghia
+voi grade DR 0-4, gop chung se gay nham lan trong bao cao lam sang.
+
+
+3. LOP INFERENCE (Python, inference/) -- VIEC CAN LAM
+----------------------------------------------------------
+3.1 Cap nhat config/multidisease/config.json (THU CONG, vi Colab khong tu
+    ghi lai file nay -- xem muc 0)
+    Them vao config hien co:
+      "val_accuracy": 0.6221294363256785,
+      "val_macro_f1": 0.5811294200297471,
+      "best_epoch": 12,
+      "is_experimental": true
+    Xoa dong "notes" placeholder, thay bang ghi chu ve gioi han (single-
+    label, ngay train, nguon checkpoint Colab).
+
+3.2 Tao inference/multidisease_engine.py (mo phong inference/quality_
+    engine.py -- KHONG dung ensemble/vmap nhu DR vi day chi la 1 backbone
+    don, khong co fold):
+      - MultiDiseaseEngine.__init__(): goi load_multidisease_model() 1 lan
+        luc startup (giu am trong VRAM, giong triet ly muc 2.3 cua
+        archetechture.txt), ap dung CUNG load_and_crop +
+        preprocess_for_backbone(backbone_name) de dam bao khop phan phoi
+        du lieu voi luc train (scripts/train_multidisease.py dung dung 2
+        ham nay).
+      - .predict(image_path) -> softmax(logits) tren 8 lop, tra ve:
+          {
+            "top_label": str,
+            "top_prob": float,
+            "top3": [{"label": str, "prob": float}, ...],
+            "probs": {label: prob, ...},   # ca 8 lop, cho UI ve bieu do
+          }
+      - KHONG suy dien "co benh/khong co benh" nhi phan tu top_label --
+        chi tra ve phan phoi xac suat, de web/ tu quyet dinh cach hien thi
+        (tranh cung mot logic gate/blocked nhu quality vi day khong phai
+        gatekeeper).
+
+3.3 Sua inference/main.py:
+      - lifespan: doi asyncio.gather(...) tu 2 thanh 3 phan tu (them
+        asyncio.to_thread(MultiDiseaseEngine)) -- giu nguyen nguyen tac
+        "song song, khong cong don thoi gian khoi dong" da ap dung cho
+        quality_engine.
+      - Endpoint moi: POST /multidisease-screen (multipart file) ->
+        MultiDiseaseResponse{top_label, top_prob, top3, probs,
+        model_version, is_experimental}. model_version/is_experimental
+        doc tu MULTIDISEASE_CONFIG (muc 3.1) de FE luon co disclaimer moi
+        khi doi model, khong hardcode string canh bao trong web/.
+      - KHONG dong bo hoa (gop) voi /predict nhu quality-check dang lam --
+        day la endpoint doc lap, web/ goi rieng khi nguoi dung yeu cau,
+        khong goi tu dong trong route.ts cua /predict.
+
+3.4 Kiem thu truoc khi coi la xong:
+    - scripts/validate_multidisease.py (mo phong scripts/validate_
+      quality_gate.py): chay MultiDiseaseEngine tren test_images/ hien co
+      CHI DE XAC NHAN SCRIPT CHAY DUNG (khong crash, output dung dinh
+      dang) -- test_images/ chi co nhan DR, KHONG co nhan benh mat khac,
+      nen KHONG dung ket qua o day de danh gia lai accuracy 62%.
+    - Neu muon doi chieu lai accuracy that: dung tap val ODIR-5K da tach
+      trong luc train tren Colab (patient-level split, xem docstring
+      scripts/train_multidisease.py) -- tap nay hien KHONG con luu local
+      (da xoa data/odir5k_raw/ theo plan.txt Phase 2 doan cuoi).
+    - Regression: goi lai /predict va /explain (DR) sau khi them
+      MultiDiseaseEngine vao lifespan, xac nhan KHONG doi ket qua (giong
+      cach da lam voi quality_engine, archetechture.txt muc 10.4).
+
+
+4. LOP WEB (Next.js, web/) -- TINH NANG DOC LAP, KHONG SUA LUONG DR
+----------------------------------------------------------
+4.1 Prisma (web/prisma/schema.prisma): them model MOI, KHONG sua model
+    Scan hien co:
+      model MultidiseaseScreening {
+        id          String   @id @default(cuid())
+        userId      String
+        user        User     @relation(fields: [userId], references: [id])
+        scanId      String?  // tuy chon: tham chieu Scan neu chay tren
+                              // anh da co trong lich su DR
+        filename    String?
+        cloudUrl    String?
+        topLabel    String
+        topProb     Float
+        probs       Json
+        modelVersion String
+        createdAt   DateTime @default(now())
+
+        @@index([userId])
+      }
+    Migration rieng (npx prisma migrate dev --name add_multidisease_
+    screening) -- KHONG dung chung migration voi bat ky thay doi Scan nao
+    khac de de rollback doc lap neu can.
+
+4.2 inference-client.ts: them type MultiDiseaseResult (khop MultiDisease
+    Response o muc 3.3) + ham screenMultiDisease(buffer, filename) goi
+    POST {INFERENCE_URL}/multidisease-screen -- cung mau toFormData() nhu
+    predictImage/checkImageQuality da co.
+
+4.3 API route moi: web/src/app/api/multidisease/route.ts
+      - POST: nhan file upload MOI, HOAC nhan scanId de tai lai anh tu
+        Cloudinary cua 1 scan DR da co (cho phep nguoi dung bam "Sang loc
+        them cac benh khac" tren 1 anh da cham DR roi, khong bat upload
+        lai) -- tuy UX quyet dinh o muc 4.4, ca 2 huong deu hop ly, chon 1
+        khi code that.
+      - Goi screenMultiDisease(), luu ket qua vao MultidiseaseScreening
+        (muc 4.1), tra ve cho FE.
+      - GET (tuy chon): liet ke lich su MultidiseaseScreening cua user,
+        giong cach /api/scans/route.ts dang lam voi Scan.
+
+4.4 UI -- trang/tinh nang rieng, KHONG nhet vao trang ket-qua/[imageId]
+    cua DR:
+      - De xuat: web/src/app/workspace/sang-loc-da-benh/ (trang moi, doc
+        lap voi tai-anh/ va ket-qua/ cua luong DR), hoac 1 nut/lien ket ro
+        rang "Sang loc them cac benh khac (thu nghiem)" tren trang ket-qua
+        DR de dan sang trang nay -- KHONG tu dong hien ket qua nay chung
+        khung voi grade DR.
+      - Component ket qua: hien topLabel + top3 kem % xac suat (bieu do
+        thanh ngang don gian), KEM BANNER CANH BAO CO DINH, RO RANG, luon
+        hien thi (khong an duoc):
+          "Tinh nang thu nghiem -- do chinh xac ~62% tren du lieu kiem
+          thu noi bo (ODIR-5K), CHUA duoc kiem chung lam sang. Chi mang
+          tinh tham khao so bo, KHONG dung de chan doan hay thay the y
+          kien bac si chuyen khoa."
+        Noi dung banner nen doc tu is_experimental/model_version tra ve
+        tu API (muc 3.3) de dam bao dong bo khi model doi, khong hardcode
+        rieng o FE.
+      - Dashboard bac si (web/src/app/doctor/...): neu muon hien ket qua
+        nay cho bac si, dat trong 1 tab/section rieng ten "Sang loc da
+        benh (thu nghiem)", KHONG tron vao khu vuc hien grade DR chinh de
+        tranh bac si nham day la ket qua da duoc kiem chung tuong duong
+        DR.
+
+
+5. THU TU TRIEN KHAI DE XUAT (theo thu tu code)
+----------------------------------------------------------
+  (1) Cap nhat config/multidisease/config.json (muc 3.1) -- khong can code,
+      chi sua JSON, lam truoc tien vi moi buoc sau deu doc tu day.
+  (2) inference/multidisease_engine.py (muc 3.2).
+  (3) inference/main.py: them vao lifespan + endpoint /multidisease-screen
+      (muc 3.3).
+  (4) scripts/validate_multidisease.py (muc 3.4) -- chay thu, xac nhan
+      response dung dinh dang truoc khi dung web/ dam vao.
+  (5) Regression /predict, /explain (muc 3.4).
+  (6) Prisma migration MultidiseaseScreening (muc 4.1).
+  (7) inference-client.ts + api/multidisease/route.ts (muc 4.2-4.3).
+  (8) UI trang/component rieng + banner canh bao (muc 4.4).
+  (9) Cap nhat plans/archetechture.txt (them muc 11, giong cach muc 10 da
+      ghi cho quality gatekeeper) sau khi code xong THAT, kem so lieu
+      kiem chung thuc te -- KHONG ghi truoc khi trien khai xong.
+
+
+6. RUI RO / GIOI HAN PHAI NEU RO (voi nguoi dung cuoi VA trong code review)
+----------------------------------------------------------
+  - Single-label 8-way, KHONG PHAI multi-label calibrated: 1 benh nhan co
+    the mac dong thoi nhieu benh (vd vua diabetes vua cataract) nhung model
+    chi tra ve 1 nhan troi nhat -- topLabel="cataract" KHONG co nghia la
+    "khong co diabetes", chi la "cataract la tin hieu manh nhat trong anh
+    theo cach du lieu train (ODIR-5K full_df.csv) da don gian hoa nhan".
+    Phai the hien dieu nay trong copy UI, khong chi trong code comment.
+  - macro F1 0.581 tren 8 lop KHONG deu -- lop it du lieu (hypertension
+    ~128 anh luc train, xem plan.txt) se do kem hon nhieu so lop nhieu du
+    lieu (normal, diabetes). Khong nen coi cac lop nhu nhau ve do tin cay.
+  - Chua kiem tra lai license cho muc dich thuong mai cua dataset Kaggle
+    "andrewmvd/ocular-disease-recognition-odir5k" (ban re-derive tu
+    ODIR-5K goc) -- neu du an chuyen huong thuong mai hoa, xem lai muc
+    nay TRUOC, tuong tu canh bao da ghi cho QuickQual o archetechture.txt
+    muc 10.2.
+  - Neu Phase 3 (plan.txt) sau nay train duoc model glaucoma/AMD chuyen
+    biet chinh xac hon, tinh nang nay co the giu lam "sang loc so bo nhieu
+    benh cung luc" song song, hoac bi thay dan tung phan bang model
+    chuyen biet -- khong xoa ngay, vi da phu duoc pham vi rong hon (8 benh
+    thay vi 1-2 benh chuyen biet).
+
+
+7. THAM CHIEU
+----------------------------------------------------------
+  - plans/plan.txt muc 1.3, 2.5, Phase 2/3 -- nghien cuu goc + qua trinh
+    tim dataset/pretrained cho multi-disease.
+  - plans/archetechture.txt muc 9 (tac dong kien truc mo rong da-task),
+    muc 10 (mau tich hop Phase 1 dung lam tham chieu so sanh o muc 2 tren).
+  - plans/ggcolab.txt -- quy trinh train tren Colab, cach checkpoint duoc
+    tai ve lai models/multidisease/model_best.pth.

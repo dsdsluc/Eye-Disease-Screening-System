@@ -1,0 +1,15 @@
+{
+    "task": "Multi-Disease Fundus Screening (ODIR-5K baseline, plans/plan.txt Phase 2)",
+    "dataset_source": "https://www.kaggle.com/datasets/andrewmvd/ocular-disease-recognition-odir5k",
+    "backbone": "seresnext50_32x4d",
+    "image_size": 224,
+    "dropout": 0.3,
+    "labels": ["normal", "diabetes", "glaucoma", "cataract", "amd", "hypertension", "myopia", "other"],
+    "checkpoint": "model_best.pth",
+    "val_accuracy": 0.6221294363256785,
+    "val_macro_f1": 0.5811294200297471,
+    "best_epoch": 12,
+    "is_experimental": true,
+    "trained_on": "2026-08-29, Google Colab (see plans/ggcolab.txt), checkpoint copied back to models/multidisease/model_best.pth",
+    "notes": "Single-label 8-way classifier (NOT calibrated multi-label -- ODIR-5K full_df.csv rows have exactly one dominant label per eye, see scripts/train_multidisease.py docstring). 62.2% val accuracy is well below the DR ensemble's; treat as an experimental supplementary screen, not a diagnostic result -- see plans/plan_multidisease.txt section 6 for known limitations."
+}

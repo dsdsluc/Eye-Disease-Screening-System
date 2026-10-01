@@ -1,0 +1,33 @@
+{
+    "task": "Glaucoma Specialist Screening (Phase 3, plans/prep.txt)",
+    "dataset_sources": {
+        "acrima": "https://www.kaggle.com/datasets/orvile/acrima-glaucoma-assessment-using-fundus-images",
+        "origa": "https://www.kaggle.com/datasets/ferencjuhsz/origa-retinal-fundus-image-dataset",
+        "rimone": "https://www.kaggle.com/datasets/orvile/rim-one-retinal-dataset-for-assessing-glaucoma"
+    },
+    "backbone": "seresnext50_32x4d",
+    "image_size": 224,
+    "dropout": 0.3,
+    "labels": ["normal", "glaucoma"],
+    "checkpoint": "model_best.pth",
+    "val_accuracy": 0.8981818181818182,
+    "val_precision": 0.8727272727272727,
+    "val_recall": 0.8727272727272727,
+    "val_f1": 0.8727272727272727,
+    "best_epoch": 17,
+    "is_experimental": true,
+    "requires_optic_disc_crop": true,
+    "od_crop_fraction": 0.2,
+    "e2e_validation": {
+        "description": "REAL end-to-end pipeline accuracy (load_and_crop -> optic disc auto-crop -> classify) on genuine full-fundus photos with real glaucoma labels -- unlike val_accuracy/val_f1 above (measured on ACRIMA/ORIGA/RIM-ONE's pre-cropped images), this is what actually happens for a real upload. Measured 2026-09-01 via scripts/validate_glaucoma_e2e.py.",
+        "dataset": "EyePACS-AIROGS-light-V2 test split (Kaggle: deathtrooper/glaucoma-dataset-eyepacs-airogs-light-v2), 385 RG + 385 NRG, held out from the od_crop_fraction sweep below",
+        "n_images": 770,
+        "accuracy": 0.7701298701298701,
+        "precision": 0.7549019607843137,
+        "recall": 0.8,
+        "f1": 0.7768313458262351,
+        "od_crop_fraction_sweep": "od_crop_fraction was originally 0.35 (picked by eye, plans/plan_glaucoma.txt section 1) -- swept 0.10-0.60 on the AIROGS-light-v2 VALIDATION split (not test, to avoid tuning on the reported number) and found 0.20 gives the best F1 (0.7237 on a 300-image subsample vs 0.6340 at 0.35). The e2e numbers above are the 0.20 result on the untouched 770-image test split."
+    },
+    "trained_on": "2026-08-31, Google Colab (plans/Fundas_Glaucoma_Training.ipynb), checkpoint copied back to models/glaucoma/model_best.pth",
+    "notes": "IMPORTANT (plans/plan_glaucoma.txt): training images (ACRIMA/ORIGA/RIM-ONE) are ALL tight crops centered on the optic disc, not full 45-degree fundus photos like the DR/multidisease pipeline. This model must never be called on a raw full fundus image directly -- inference/glaucoma_engine.py auto-crops the optic disc region first (plans/plan_glaucoma.txt section 2, 'Huong A': automatic optic disc localization via fundus_image_toolbox, not a retrain). The auto-crop's zoom level (od_crop_fraction) is now EMPIRICALLY calibrated against real full-fundus photos with real labels (see e2e_validation above), not just eyeballed -- real end-to-end accuracy is ~77% (f1=0.777), a genuine ~10-point drop from val_f1 above, which is the honest cost of the auto-crop approximation. per-source val metrics (acrima f1=0.974, rimone f1=0.868, origa f1=0.640) were measured on the ORIGINAL disc-cropped images, before this auto-crop layer existed, and don't reflect real-upload performance. Experimental supplementary screen only, not a diagnostic result."
+}

@@ -1,0 +1,180 @@
+FUNDAS_SYSTEM -- GLAUCOMA: UU TIEN DO TIN CAY TRUOC KHI MO RONG THEM
+====================================================
+Ghi lai (2026-09-01) quyet dinh huong di TIEP THEO cho tinh nang glaucoma,
+sau khi da tich hop xong vao web (banner nguong + nut trong dialog, xem lich
+su chat truoc). Quyet dinh: KHONG di AMD (Phase 3 con lai) ngay, ma quay lai
+KIEM CHUNG do tin cay cua glaucoma truoc -- vi 1 tinh huong thuc te vua phat
+hien khi tu kiem thu.
+
+
+1. LY DO: TINH HUONG PHAT HIEN KHI TU TEST (2026-09-01)
+----------------------------------------------------------
+Nguoi dung tu chay thu "Phan tich chuyen sau" tren 1 ca that
+(http://localhost:3000/multidisease/cmtfmxpux0003uhz8tw2gp0x9) va thay:
+  - Multidisease (8-lop, softmax): xac suat glaucoma = 0.0%
+  - Glaucoma chuyen biet (nhi phan, sigmoid, sau auto-crop): 66.6%
+2 con so lech nhau RAT LON tren CUNG 1 anh. Da giai thich day KHONG PHAI loi
+(2 model khac kien truc -- softmax 8-lop bi 1 tin hieu manh (98.8% diabetes)
+"hut" het xac suat cac lop con lai, vs sigmoid nhi phan doc lap khong bi anh
+huong boi diabetes) -- nhung tinh huong nay phoi bay 1 lo hong that:
+
+    TOAN BO do tin cay da cong bo cho model glaucoma (89.8% val_accuracy,
+    87.3% val_f1, breakdown tung nguon acrima/origa/rimone -- xem checkpoint
+    va config/glaucoma/config.json) DEU DO TREN ANH DA CROP SAN QUANH DIA
+    THI GIAC (dung nguyen anh goc cua ACRIMA/ORIGA/RIM-ONE). CHUA TUNG CO 1
+    con so nao do TREN PIPELINE THAT SU DANG CHAY (anh fundus toan canh ->
+    auto-crop qua fundus_image_toolbox -> classify). Con so 66.6% nguoi dung
+    vua thay -- khong ai biet no co dang tin hon random hay khong, vi buoc
+    auto-crop (od_crop_fraction=0.35) chi duoc chon bang cach SO SANH BANG
+    MAT 3 anh (xem lich su tich hop truoc), khong co do luong dinh luong.
+
+=> Quyet dinh (nguoi dung, 2026-09-01): tam dung mo rong them benh (AMD),
+   uu tien lam ro do tin cay THAT cua pipeline glaucoma dang chay truoc.
+
+
+2. CAU HOI: CO TIM DUOC TAP ANH FUNDUS TOAN CANH CO NHAN GLAUCOMA THAT
+   KHONG? -- CO, DA TIM DUOC (2026-09-01)
+----------------------------------------------------------
+Da tra cuu qua Kaggle API (metadata + file listing, cung phuong phap da
+dung cho ACRIMA/ORIGA/RIM-ONE) va XAC NHAN BANG MAT (tai 1 anh mau that tu
+link trong mo ta dataset, xem duoi day) -- KHONG chi doc mo ta suong nhu da
+rut kinh nghiem tu vu ACRIMA/ORIGA/RIM-ONE crop-nham:
+
+    Dataset: EyePACS-AIROGS-light-V2
+    Kaggle ref: deathtrooper/glaucoma-dataset-eyepacs-airogs-light-v2
+    Nguon goc: Rotterdam EyePACS AIROGS (113.893 anh, 60.357 benh nhan,
+      ~500 dia diem chup, cung ho EyePACS voi dataset DR dang dung -- xem
+      airogs.grand-challenge.org).
+    Cau truc: eyepac-light-v2-512-jpg/{train,val,test}/{RG,NRG}/*.jpg
+      RG = referable glaucoma, NRG = non-referable glaucoma.
+      Test split: 385 RG + 385 NRG = 770 anh (khong can dung ca 8.770 anh
+      train, chi can 1 phan test/val de kiem chung).
+    XAC NHAN BANG ANH THAT: tai 1 anh "Original Image" tu chinh link minh
+    hoa trong mo ta dataset (buoc 1/7 quy trinh chuan hoa cua ho, TRUOC khi
+    ho crop) -- la ANH FUNDUS TRON DAY DU, co vien den, thay ro CA diem
+    vang LAN dia thi giac -- DUNG dinh dang can (khac han ACRIMA/ORIGA/
+    RIM-ONE la anh da crop san quanh dia thi giac). Buoc "crop" cua chinh
+    ho (mo ta trong dataset) chi la "remove black background before
+    resizing" -- GIONG HET inference/preprocessing.py::load_and_crop hien
+    tai, KHONG PHAI crop-zoom-vao-dia-thi-giac nhu ACRIMA.
+    => Day la tap validation ly tuong: dung format anh giong 100% nhung gi
+       nguoi dung that se upload.
+
+    CANH BAO LICENSE (can luu y, chua giai quyet dut diem): Kaggle ghi
+    license "other" (mo ho, khong ro dieu khoan) cho ban mirror nay. Nguon
+    goc that (Zenodo, airogs.grand-challenge.org) YEU CAU XIN QUYEN THU
+    CONG truoc khi tai ("they have to manually accept requests on Zenodo"),
+    giong muc do han che cua AREDS/HYAMD, KHONG mo hoan toan nhu Kaggle lam
+    ta tuong. Ban Kaggle "light" nay co ve la ban tai lai (redistribute) tu
+    tac gia thu 3 (Riley Kiefer, co trich dan nguon goc day du) -- CHUA xac
+    minh duoc day co phai redistribute hop phap hay khong. Vi CHI dung de
+    KIEM CHUNG NOI BO (khong retrain thuong mai, khong phat hanh lai anh),
+    rui ro thap hon truong hop dung de train/ban san pham -- nhung neu sau
+    nay quyet dinh dung tap nay de TRAIN (khong chi validate), can quay lai
+    xin quyen qua kenh chinh thuc (grand-challenge.org/Zenodo) truoc.
+
+
+3. KE HOACH KIEM CHUNG (CHUA LAM, chi moi la ke hoach)
+----------------------------------------------------------
+Muc tieu: co 1 con so accuracy/F1 THAT do tren dung pipeline dang chay
+(GlaucomaEngine.predict() nguyen ven -- load_and_crop -> dinh vi dia thi
+giac -> auto-crop 0.35 -> classify), khong phai do lai tren anh da-crop-san
+nhu luc train.
+
+  (1) Tai 1 phan nho tap test cua AIROGS-light-v2 qua Kaggle API (khong can
+      ca 770 anh -- lay mau ngau nhien vd 50-100 anh/lop la du de co uoc
+      luong thong ke hop ly, giu dung ty le RG/NRG can bang).
+  (2) Viet 1 script kiem chung (vd scripts/validate_glaucoma_e2e.py) chay
+      THANG qua GlaucomaEngine.predict() (dung nguyen ham dang dung trong
+      production, KHONG duoc viet lai logic rieng) tren tap anh nay, so
+      voi nhan that (RG=glaucoma, NRG=normal). Tinh accuracy/precision/
+      recall/F1 -- CHINH LA con so con thieu tu truoc gio.
+  (3) So sanh con so nay voi 89.8% accuracy / 87.3% F1 da cong bo (do tren
+      anh crop-san) -- chenh lech giua 2 con so = "cai gia" thuc te cua
+      buoc auto-crop xap xi (Huong A, plans/plan_glaucoma.txt cu -- ghi
+      chu: file nay da bi xoa/ghi de, tham chieu lai lich su chat neu can
+      chi tiet Huong A/B ban dau).
+  (4) Tien xa hon (tuy chon, neu (2)-(3) cho thay ket qua kem): dung CHINH
+      tap AIROGS-light-v2 (co ca train/val, 8.770 anh) de HIEU CHINH LAI
+      od_crop_fraction (hien dang la 0.35, chon bang mat) bang cach quet
+      vai gia tri (vd 0.25/0.30/0.35/0.40/0.45) va chon gia tri cho F1 cao
+      nhat tren tap validation THAT, thay vi chi so sanh truc quan 3 anh
+      nhu da lam truoc do.
+
+
+4. TIEU CHI QUYET DINH SAU KHI CO KET QUA
+----------------------------------------------------------
+  - Neu F1/accuracy do duoc o buoc (2) GAN VOI 87.3%/89.8% da cong bo (vd
+    lech duoi ~10-15 diem %): auto-crop xap xi la chap nhan duoc, giu
+    nguyen huong hien tai (Huong A), chi can cap nhat lai config/glaucoma/
+    config.json voi con so THAT nay (thay vi chi ghi con so do tren anh
+    crop-san nhu hien tai) va noi ro trong disclaimer.
+  - Neu F1/accuracy giam manh (vd duoi 60%, gan muc random hoac kem hon ca
+    multidisease baseline): auto-crop KHONG dang tin cay -- 2 lua chon:
+      (a) Hieu chinh lai od_crop_fraction theo muc (4) muc 3 o tren, do lai;
+      (b) Neu van khong cai thien duoc nhieu: CAN NHAC HUONG B (retrain
+          truc tiep tren AIROGS-light-v2 -- gio DA CO san 1 dataset fundus
+          toan canh, can bang, quy mo lon hon nhieu (8.770 anh) so voi
+          ACRIMA+ORIGA+RIM-ONE cong lai (1.840 anh) -- retrain truc tiep
+          tren dung dinh dang anh that se LOAI BO HOAN TOAN rui ro auto-
+          crop-sai, khong con phu thuoc buoc dinh vi dia thi giac tu mo
+          hinh ben thu 3 nua. Day co the la lua chon TOT HON Huong A ve
+          lau dai, chi la truoc do (khi chua tim ra AIROGS-light) khong co
+          dataset toan canh nao du lon/de tiep can de lam viec nay).
+  - Ca 2 truong hop deu KHONG dung lai o muc "co ve on" chu quan nhu da
+    lam voi od_crop_fraction=0.35 truoc do -- phai co con so do duoc that.
+
+
+5. KET QUA KIEM CHUNG (2026-09-01, DA LAM XONG)
+----------------------------------------------------------
+Da thuc hien day du muc 3 (tai AIROGS-light-v2 test split that qua Kaggle
+API, viet scripts/validate_glaucoma_e2e.py chay THANG qua GlaucomaEngine.
+predict() khong sua logic, do tren toan bo 770 anh test that):
+
+    od_crop_fraction=0.35 (gia tri cu, chon bang mat):
+      accuracy=0.7519  precision=0.7803  recall=0.7013  f1=0.7387
+
+Sau do lam them 1 buoc KHONG nam trong ke hoach ban dau nhung hop ly de lam
+luon (vi da co san du lieu): quet od_crop_fraction tren TAP VALIDATION rieng
+(770 anh KHAC, khong dung tap test) de tranh tune-tren-chinh-tap-bao-cao:
+
+    frac=0.10 -> f1=0.5804   frac=0.20 -> f1=0.7237 (DINH, tot nhat)
+    frac=0.25 -> f1=0.6545   frac=0.35 -> f1=0.6340   frac=0.60 -> f1=0.5815
+
+    (quet tren mau 300/770 cua tap validation cho toc do; F1 giam ca 2
+    huong tu dinh 0.20 -- khong phai xu huong don dieu bi cat ngang)
+
+=> Doi od_crop_fraction: 0.35 -> 0.20. Chay lai TREN TAP TEST (770 anh,
+   CHUA DUNG DE TUNE) voi gia tri moi de co con so cuoi cung khong thien vi:
+
+    od_crop_fraction=0.20 (gia tri moi, hieu chinh thuc nghiem):
+      accuracy=0.7701  precision=0.7549  recall=0.8000  f1=0.7768
+
+So voi 89.8%/87.3% da cong bo luc train (do tren anh crop-san): chenh lech
+con ~10-12 diem % (F1 87.3% -> 77.7%) -- ROI VAO NGUONG "CHAP NHAN DUOC" da
+dat ra o muc 4 (duoi ~10-15 diem %). KET LUAN: giu nguyen Huong A (auto-
+crop), KHONG can chuyen sang Huong B (retrain tren AIROGS) o thoi diem nay.
+
+DA CAP NHAT:
+  - config/glaucoma/config.json: od_crop_fraction 0.35 -> 0.20, them khoi
+    "e2e_validation" ghi day du phuong phap + con so that, sua "notes" de
+    khong con noi "chua hieu chinh" (gio DA hieu chinh thuc nghiem, chi la
+    van thap hon DR).
+  - web/src/components/glaucoma/glaucoma-result-dialog.tsx: disclaimer gio
+    neu con so that (~77%) thay vi cau chung chung "mang tinh uoc luong".
+  - scripts/validate_glaucoma_e2e.py: tu dong tai dataset neu chua co (khong
+    commit du lieu tho), ho tro --limit va --od-crop-fraction de tai su
+    dung cho lan hieu chinh sau (vd khi co checkpoint glaucoma moi).
+  - Da xoa data/glaucoma_validation_raw/ (~524MB, dataset tho) sau khi dung
+    xong -- giu lai data/glaucoma_e2e_validation_result.json (nhe, la ket
+    qua) lam ho so tham chieu.
+
+VIEC CHUA LAM / MO O SAU:
+  - CHUA lam lai buoc nay cho multidisease (model 8-lop cung chua tung duoc
+    kiem chung end-to-end tren tap co nhan that ngoai ODIR-5K).
+  - CHUA quyet dinh AMD (Phase 3 con lai) -- van dang tam hoan; gio co the
+    quay lai can nhac, vi vong kiem chung glaucoma da xong va cho ket qua
+    chap nhan duoc.
+  - Precision/recall hien tai (75.5%/80.0%) chua duoc toi uu rieng (vd doi
+    nguong quyet dinh 0.5 sang gia tri khac de uu tien recall cao hon, phu
+    hop bai toan sang loc benh) -- co the lam sau neu can.

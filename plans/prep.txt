@@ -1,0 +1,228 @@
+FUNDAS_SYSTEM -- CHUAN BI CHO PHASE 3: GLAUCOMA CHUYEN BIET
+(plans/plan.txt Phase 3, muc 2.2) -- KIEM TRA KHA THI TRUOC KHI TRAIN
+====================================================
+Muc dich file nay (2026-08-30): sau khi da trien khai xong multidisease
+baseline (Phase 2, 62.2% val accuracy, dang chay nhu tinh nang rieng --
+xem plans/plan_multidisease.txt), quyet dinh la CHUA vao Phase 3 ngay, nhung
+THU chuan bi truoc cho huong glaucoma chuyen biet (uu tien hon AMD vi kien
+truc gan DR nhat va it rao can dataset hon). File nay liet ke nhung gi CAN
+CO/CAN KIEM TRA truoc khi bat tay train that, de nguoi dung tu danh gia
+kha thi -- CHUA code gi ca.
+
+TIN TOT so voi ghi nhan cu trong plan.txt Phase 3 (2026-08-29, luc do ket
+luan "khong tim duoc pretrained, se phai tu train, dataset kho xin hon
+Kaggle"): tra cuu lai lan nay (2026-08-30, qua Kaggle API metadata, khong
+chi doc README) phat hien CA 4 dataset kinh dien deu co ban mirror tren
+KAGGLE (giong ODIR-5K), KHONG can dang ky rieng qua IEEE DataPort/grand-
+challenge.org nhu du kien ban dau -- xem muc 1.
+
+
+1. DATASET KHA DUNG (da xac nhan qua Kaggle API metadata, 2026-08-30)
+----------------------------------------------------------
+    Dataset      Kaggle ref                                          So anh          License (Kaggle ghi)
+    -----------  ---------------------------------------------------  --------------  --------------------------
+    ACRIMA       orvile/acrima-glaucoma-assessment-using-fundus-images 705 (396G/309N) CC BY 4.0
+    ORIGA        ferencjuhsz/origa-retinal-fundus-image-dataset        ~650 (theo paper goc: 168G/482N) MIT (*)
+    RIM-ONE DL   orvile/rim-one-retinal-dataset-for-assessing-glaucoma  485 (172G/313N) CC BY 4.0 (**)
+    DRISHTI-GS1  lokeshsaipureddi/drishtigs-retina-dataset-for-onh-seg  101 (50 train/51 test, chu yeu segmentation) CC0-1.0
+    (combo) ORIGA+REFUGE+G1020 + mask OD/OC:
+                 arnavjain1/glaucoma-datasets                          lon hon nhieu, co segmentation mask CC BY-NC 4.0 (KHONG thuong mai)
+
+    Tat ca kiem tra bang `kaggle datasets metadata <ref>` (dung kaggle.json
+    da co tu Phase 2 ODIR-5K), KHONG chi doc mo ta trang web -- usabilityRating
+    ACRIMA/ORIGA/RIM-ONE deu = 1.0 (Kaggle danh gia metadata day du), rieng
+    DRISHTI-GS1 chi 0.56 (thieu metadata).
+
+    Ghep 3 bo chinh (ACRIMA + ORIGA + RIM-ONE) = 1840 anh, 736 glaucoma
+    (40%) / 1104 normal (60%) -- ty le CAN BANG HON NHIEU so voi class
+    imbalance ~22 lan da gap o ODIR-5K Phase 2. Day la tin hieu tot cho kha
+    thi huan luyen.
+
+(*) CANH BAO license ORIGA: tra lai nguon goc (paper Zhang et al., ORIGA-
+    light, NUS/Singapore Eye Research Institute, tu du lieu lam sang SiMES
+    2004-2007) -- day la dataset lam sang cua 1 nghien cuu y te, KHONG co
+    dau hieu nao cho thay tac gia goc phat hanh duoi MIT. Nhan "MIT" tren
+    Kaggle GAN NHU CHAC CHAN la do NGUOI UPLOAD (ferencjuhsz) tu gan, KHONG
+    phai giay phep that tu NUS/SERI -- CUNG rui ro nhu tinh huong QuickQual
+    .pkl (archetechture.txt muc 10.2) va ODIR-5K full_df.csv (plan.txt Phase
+    2), can duoc nguoi dung CHAP THUAN RUI RO tuong tu truoc khi dung, kem
+    ca canh bao neu sau nay thuong mai hoa.
+
+(**) CANH BAO license RIM-ONE: the Kaggle GHI "CC BY 4.0" nhung MO TA CHINH
+    CUA BAN THAN dataset (dan lai tu tac gia goc, nam ngay trong metadata)
+    lai noi RO: "Data included in this database can only be used for
+    research and educational purposes... Copy, redistribution, and any
+    unauthorized commercial use are prohibited." -- 2 nguon MAU THUAN NHAU
+    (tag Kaggle vs. dieu khoan goc). PHAI theo dieu khoan GOC (nghiem ngat
+    hon) chu khong theo tag Kaggle: nghia la RIM-ONE la non-commercial,
+    research/educational only -- giong tinh trang ORIGA o tren.
+    Tac gia RIM-ONE con yeu cau KHONG duoc tron voi database khac khi huan
+    luyen ("do not add more images from different databases") de dam bao
+    ket qua so sanh duoc giua cac cong bo khoa hoc -- KHONG ap dung cho du
+    an nay (khong dang bao cao khoa hoc), nhung ghi nhan de hieu tai sao ho
+    dat dieu kien nay.
+
+    => Tom lai: NEU dung ca 3 bo (ACRIMA + ORIGA + RIM-ONE), CA HE THONG
+    glaucoma nay se thua ke rang buoc "non-commercial/research-only" tu
+    ORIGA va RIM-ONE (chi rieng ACRIMA la CC BY 4.0 that su, cho phep
+    thuong mai co ghi nguon).
+
+    [DA XAC NHAN, 2026-08-30] Nguoi dung cho biet day la DO AN CA NHAN,
+    KHONG kinh doanh/thuong mai hoa -- vi vay rang buoc "non-commercial/
+    research-only" cua ORIGA/RIM-ONE KHONG con la rao can, giong tinh huong
+    da chap nhan cho QuickQual (archetechture.txt muc 10.2). Van GIU LAI
+    toan bo phan phan tich license o tren trong file nay lam ho so tham
+    chieu -- NEU du an nay sau nay chuyen huong thuong mai hoa (build lai
+    thanh san pham kinh doanh), PHAI quay lai doc ky muc 1 truoc, cung mot
+    nguyen tac da ghi cho QuickQual va ODIR-5K.
+
+
+2. VIEC CAN KIEM TRA SAU KHI TAI ANH THAT (chua the xac nhan tu metadata)
+----------------------------------------------------------
+    Day la nhung rui ro ky thuat CHUA THE loai tru neu chi doc mo ta --
+    phai tai vai chuc anh mau ve kiem tra truc tiep TRUOC khi cam ket huan
+    luyen toan bo, giong cach da phat hien loi nhan per-eye/patient-level o
+    ODIR-5K (plan.txt Phase 2) chi sau khi mo file that.
+
+    2.1 Quy uoc crop CO THE KHAC NHAU giua 3 bo -- rui ro lon nhat
+        Mo ta ACRIMA noi ro anh "were cropped around the optic disc and
+        renamed" -- tuc la ACRIMA CO THE la anh da crop sat quanh dia thi
+        giac (mot vung nho cua fundus), KHAC HAN voi anh fundus TRON DAY DU
+        (ca vong mac) ma inference/preprocessing.py::load_and_crop() dang
+        gia dinh (crop vien den quanh HINH TRON DAY MAT chuan APTOS-kernel).
+        Neu ACRIMA thuc su la anh da-crop-san quanh dia thi giac, chay
+        load_and_crop len no se cho ket qua sai (khong con vien den de
+        crop, hoac crop nham). ORIGA/RIM-ONE nhieu kha nang la anh fundus
+        day du (giong DR) nhung CAN XAC NHAN TRUC TIEP, khong duoc gia dinh.
+        => Hanh dong: tai ~10-20 anh mau tu MOI bo, mo bang mat / hien thi
+        kich thuoc-ty le, so sanh voi anh fundus DR hien co trong test_
+        images/ TRUOC khi quyet dinh dung chung preprocessing.py hay can
+        viet 1 nhanh preprocessing rieng cho ACRIMA (vd bo qua load_and_crop,
+        chi resize+normalize thang).
+
+    2.2 Khong co patient ID trong ACRIMA/ORIGA/RIM-ONE (khac ODIR-5K)
+        ODIR-5K co cot patient ID ro rang de split tranh ro ri du lieu
+        (2 mat cung 1 nguoi). Mo ta 3 bo glaucoma o tren KHONG de cap patient
+        ID -- ACRIMA chi co so thu tu anh (Im001..Im705), khong ro co phai
+        moi anh 1 benh nhan khac nhau hay khong (co the co benh nhan xuat
+        hien ca 2 mat/nhieu lan chup). Can kiem tra file/thu muc that xem co
+        metadata nao (ten file, CSV di kem) tiet lo quan he benh nhan-anh
+        hay khong; neu khong co, chi con cach chap nhan split theo tung anh
+        (rui ro ro ri nho hon ODIR vi tap nho hon nhung van nen ghi nhan ro
+        trong code/doc, khong gia vo la split-theo-benh-nhan).
+
+    2.3 Domain shift giua 3 nguon (Tay Ban Nha, Singapore, Tay Ban Nha)
+        ACRIMA + RIM-ONE deu tu benh vien Tay Ban Nha (nhung khac benh
+        vien/may chup), ORIGA tu Singapore (nghien cuu SiMES, dan so Malay).
+        May chup, anh sang, dan so benh nhan khac nhau giua 3 nguon co the
+        gay model hoc "dau hieu nguon goc anh" thay vi "dau hieu glaucoma
+        that" (shortcut learning). Khuyen nghi: luon stratify split theo CA
+        (label, nguon-dataset) -- khong chi theo label -- de moi nguon deu
+        co mat can doi trong ca train/val, va bao cao rieng accuracy theo
+        tung nguon (khong chi accuracy tong) de phat hien neu model chi hoc
+        tot 1 nguon.
+
+
+3. DE XUAT KIEN TRUC/HUAN LUYEN (dua kinh nghiem Phase 2 ODIR-5K)
+----------------------------------------------------------
+    - KHONG dung ensemble "4 backbone x 5 fold = 20 model" nhu DR ngay tu
+      dau -- tap hop 1840 anh qua nho de train 20 model rieng khong overfit
+      nang. Bat dau giong Phase 2: 1 backbone don (co the tai dung
+      seresnext50_32x4d cho nhat quan) + 1 head Linear/sigmoid nhi phan.
+    - Vi tap nho (~1840 anh, nho hon nhieu so 14.4K cua ODIR-5K), 1 lan
+      split 85/15 co dinh se cho tap validation chi ~276 anh -- do nhieu
+      thong ke kha lon giua cac epoch. Nen dung K-fold cross-validation
+      (vd 5-fold) thay vi 1 split co dinh, de co uoc luong on dinh hon
+      truoc khi quyet dinh co "dat yeu cau" hay khong.
+    - Loss: co the dung BCE (nhi phan) thay vi CrossEntropy 8-lop nhu Phase
+      2 -- don gian hon vi day chi la 2 lop (glaucoma/normal), khong can
+      class-weight manh vi ty le 40/60 kha can bang (khac 22 lan lech cua
+      ODIR-5K).
+    - Preprocessing: TUY THUOC ket qua kiem tra muc 2.1 -- neu ACRIMA thuc
+      su la anh da-crop-quanh-dia-thi-giac, co the can 2 nhanh xu ly khac
+      nhau trong cung 1 script train (mot cho anh fundus day du, mot cho
+      anh da crop san) hoac loai ACRIMA khoi tap train chinh va chi dung
+      lam tap test rieng.
+    - Ha tang: dua tren kinh nghiem Phase 2 (train local bi loi buffer +
+      tranh chap CPU voi 1 tien trinh Python he thong chay nham, phai huy
+      ca hai va chuyen sang Colab) -- khuyen nghi DUNG LAI pipeline Colab
+      (plans/ggcolab.txt) ngay tu dau thay vi thu local truoc, tranh lap
+      lai su co da gap. Tap du lieu nho hon nhieu (1840 vs 14.4K anh) nen
+      thoi gian train/tai se nhanh hon dang ke.
+
+
+4. TIEU CHI THANH CONG (CAN QUYET DINH TRUOC KHI TRAIN, khong phai sau)
+----------------------------------------------------------
+    Phase 3 chi dang lam NEU ket qua vuot ro ret model multidisease hien co
+    cho rieng nhan "glaucoma" -- can 1 con so cu the de so sanh, hien CHUA
+    CO vi file model_best.pth cua multidisease (plans/plan_multidisease.txt)
+    chi luu val_accuracy/val_macro_f1 TONG THE (8 lop gop lai), KHONG co
+    per-class accuracy/recall rieng cho glaucoma.
+    => Viec can lam TRUOC (thuoc pham vi "chuan bi", khong can du lieu
+       glaucoma moi): chay lai scripts/validate_multidisease.py hoac 1
+       ban mo rong co tinh confusion matrix/per-class recall cho model
+       multidisease hien tai, de co baseline "hien tai glaucoma recall/
+       precision = X%" lam moc so sanh. Neu khong co tap test glaucoma that
+       de do (test_images/ hien tai chi co nhan DR, khong co nhan glaucoma),
+       day cung la 1 viec can chuan bi: giu lai 1 phan nho (~10-15%) cua
+       ACRIMA/ORIGA/RIM-ONE lam tap TEST RIENG, dung CHUNG de danh gia CA
+       model multidisease hien tai LAN model glaucoma chuyen biet moi, cho
+       so sanh cong bang.
+
+
+5. KE HOACH TICH HOP NEU TRAIN THANH CONG (tuong tu multidisease)
+----------------------------------------------------------
+    Dung lai đung mau da lam voi quality/multidisease (archetechture.txt
+    muc 9.1, plan_multidisease.txt muc 3):
+      - config/glaucoma/config.json, models/glaucoma/model_best.pth
+      - inference/glaucoma_model.py + inference/glaucoma_engine.py
+      - Endpoint rieng POST /glaucoma-screen trong inference/main.py, THEM
+        vao lifespan asyncio.gather (gio se la 4 engine song song)
+      - KHONG gop vao endpoint /multidisease-screen hien co -- giu nguyen
+        nguyen tac moi task/benh la 1 engine + 1 endpoint doc lap (de dang
+        bat/tat, retrain, hoac go bo tung task ma khong dung task khac)
+      - Ben web/: tuy chon dung nhu 1 the/badge "do tin cay cao hon" canh
+        ket qua glaucoma cua multidisease-screen, hoac thay the han neu do
+        chinh xac vuot troi ro ret (quyet dinh sau khi co so lieu that,
+        khong quyet truoc).
+
+
+6. THU TU CAC BUOC CHUAN BI DE XUAT (TRUOC khi dong y train that)
+----------------------------------------------------------
+    (1) [XONG, 2026-08-30] License da duoc nguoi dung chap thuan (do an ca
+        nhan, khong thuong mai hoa) -- xem muc 1.
+    (2) Tai thu vai chuc anh mau (khong can tai ca bo) tu ca 3 dataset qua
+        Kaggle API, kiem tra truc quan muc 2.1 (quy uoc crop) va 2.2 (co
+        patient ID/metadata khong).
+    (3) Viet 1 ban mo rong cua scripts/validate_multidisease.py de do
+        per-class recall/precision cho "glaucoma" tren model multidisease
+        hien tai -- co baseline so sanh (muc 4) TRUOC khi train model moi.
+    (4) Neu ca (2) va (3) on: tai day du 3 dataset, viet script gop nhan
+        + split stratify (label, nguon), chuyen len Colab huan luyen
+        (mau lai ggcolab.txt).
+    (5) Sau khi co checkpoint: so sanh voi baseline (3) tren CUNG 1 tap
+        test rieng bo qua luc train -- CHI tich hop (muc 5) neu vuot ro
+        ret, khong chi vi "co ve khop hon ly thuyet".
+
+
+7. SO SANH NHANH VOI AMD (de nguoi dung tien tren neu muon doi huong)
+----------------------------------------------------------
+    AMD (plan.txt muc 2.3) van con ket qua tra cuu cu (2026-08-29): dataset
+    chinh AREDS (59.302 anh) khoa qua dbGaP (can xin phep, co the mat nhieu
+    tuan/khong duoc duyet), thay the mo HYAMD tren PhysioNet cung can tao
+    tai khoan + ky data use agreement -- CHUA thu tim mirror Kaggle nhu vua
+    lam cho glaucoma o tren. Neu glaucoma (file nay) khong kha thi vi ly do
+    license/ky thuat, co the quay lai thu tim mirror Kaggle cho AREDS/HYAMD
+    truoc khi ket luan AMD kho hon -- CHUA lam buoc nay, ghi lai de nguoi
+    dung biet day van la 1 huong du phong chua kiem tra ky.
+
+
+8. CAU HOI MO CAN NGUOI DUNG QUYET DINH
+----------------------------------------------------------
+    - License (muc 1) DA CHOT -- do an ca nhan, dung ca 3 dataset
+      (ACRIMA + ORIGA + RIM-ONE, 1840 anh) khong con rao can license.
+    - Muon lam buoc (2)-(3) o muc 6 (tai anh mau + do baseline hien tai)
+      ngay bay gio de xac nhan kha thi ky thuat, hay muon bo qua buoc kiem
+      tra than trong nay va tai full 3 dataset + train luon (nhanh hon
+      nhung rui ro phai lam lai neu muc 2.1/2.2 phat hien van de sau khi
+      da tai het)?

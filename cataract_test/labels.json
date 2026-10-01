@@ -1,0 +1,52 @@
+[
+  {
+    "filename": "01_cataract.jpg",
+    "true_label": "cataract",
+    "native_short_side": 182
+  },
+  {
+    "filename": "02_normal.jpg",
+    "true_label": "normal",
+    "native_short_side": 66
+  },
+  {
+    "filename": "03_cataract.jpg",
+    "true_label": "cataract",
+    "native_short_side": 161
+  },
+  {
+    "filename": "04_normal.jpg",
+    "true_label": "normal",
+    "native_short_side": 57
+  },
+  {
+    "filename": "05_normal.jpg",
+    "true_label": "normal",
+    "native_short_side": 57
+  },
+  {
+    "filename": "06_normal.jpg",
+    "true_label": "normal",
+    "native_short_side": 52
+  },
+  {
+    "filename": "07_cataract.jpg",
+    "true_label": "cataract",
+    "native_short_side": 123
+  },
+  {
+    "filename": "08_normal.jpg",
+    "true_label": "normal",
+    "native_short_side": 49
+  },
+  {
+    "filename": "09_cataract.jpg",
+    "true_label": "cataract",
+    "native_short_side": 203
+  },
+  {
+    "filename": "10_cataract.jpg",
+    "true_label": "cataract",
+    "native_short_side": 316
+  }
+]

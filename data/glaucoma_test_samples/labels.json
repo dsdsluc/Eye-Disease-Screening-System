@@ -1,0 +1,52 @@
+[
+  {
+    "filename": "01_rimone_glaucoma.png",
+    "true_label": "glaucoma",
+    "source": "rimone"
+  },
+  {
+    "filename": "02_rimone_glaucoma.png",
+    "true_label": "glaucoma",
+    "source": "rimone"
+  },
+  {
+    "filename": "03_origa_glaucoma.jpg",
+    "true_label": "glaucoma",
+    "source": "origa"
+  },
+  {
+    "filename": "04_acrima_normal.jpg",
+    "true_label": "normal",
+    "source": "acrima"
+  },
+  {
+    "filename": "05_rimone_normal.png",
+    "true_label": "normal",
+    "source": "rimone"
+  },
+  {
+    "filename": "06_origa_normal.jpg",
+    "true_label": "normal",
+    "source": "origa"
+  },
+  {
+    "filename": "07_acrima_glaucoma.jpg",
+    "true_label": "glaucoma",
+    "source": "acrima"
+  },
+  {
+    "filename": "08_rimone_glaucoma.png",
+    "true_label": "glaucoma",
+    "source": "rimone"
+  },
+  {
+    "filename": "09_origa_normal.jpg",
+    "true_label": "normal",
+    "source": "origa"
+  },
+  {
+    "filename": "10_acrima_normal.jpg",
+    "true_label": "normal",
+    "source": "acrima"
+  }
+]

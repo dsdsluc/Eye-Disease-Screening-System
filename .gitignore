@@ -1,0 +1,42 @@
+# Local environments and secrets
+.env
+.env.*
+!.env.example
+.venv/
+.wheel_cache/
+
+# Python cache and tooling
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# JavaScript / Next.js generated files
+node_modules/
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# Large ML artifacts (store externally or with Git LFS)
+models/
+*.pth
+*.pkl
+*.pt
+*.onnx
+
+# Runtime and downloaded data
+data/raw/
+download/
+
+# Editor / OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Preserved metadata from the former nested web repository
+web/.git.backup/
+

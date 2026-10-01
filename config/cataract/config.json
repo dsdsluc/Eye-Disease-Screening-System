@@ -1,0 +1,28 @@
+{
+    "task": "Cataract Specialist Screening (anterior/external eye photo, plans/plan_cataract.txt, v2)",
+    "dataset_source": "https://www.kaggle.com/datasets/orvile/eye-diseases-classification (Mendeley doi:10.17632/n9zp473wfw.1)",
+    "backbone": "seresnext50_32x4d",
+    "image_size": 224,
+    "dropout": 0.3,
+    "labels": ["normal", "cataract"],
+    "checkpoint": "model_best.pth",
+    "val_accuracy": 1.0,
+    "val_precision": 1.0,
+    "val_recall": 1.0,
+    "val_f1": 1.0,
+    "best_epoch": 3,
+    "is_experimental": true,
+    "not_fundus_based": true,
+    "requires_eye_roi_crop": true,
+    "sharper_label_at_train_time": 0,
+    "blur_sigma_applied_to_normal_at_train_time": 1,
+    "sharpness_ratio_before_equalization": 4.45,
+    "sharpness_ratio_after_equalization": 2.10,
+    "known_caveats": [
+        "v1 of the training notebook (2026-09-02) equalized by native pixel resolution, which was the wrong proxy (the smaller-pixel class had HIGHER measured sharpness, likely web-thumbnail sharpening artifacts) and produced a trivially-shortcuttable model (val_f1=1.000 from epoch 1). v2 (this checkpoint) equalizes directly on measured Laplacian-variance sharpness instead, reducing the before/after gap from 4.45x to 2.10x -- NOT fully closed to 1x, still a residual yellow flag.",
+        "Measured two additional hypothesized confounds with real numbers before accepting this checkpoint: (a) grayscale-vs-color -- mean colorfulness was similar between classes (cataract 51.93 vs normal 54.22), only a minor 8.5%-vs-0.2% tail of near-grayscale images in Normal, too small a subset to explain the near-perfect validation accuracy on its own; (b) composition/zoom-level -- a larger 32-image visual sample showed no consistent framing split between classes. Neither appears to be the dominant driver; the visually blatant, high-contrast cataract-vs-clear-pupil difference across a diverse 32-image sample (varied eye/skin color, lighting) is a plausible legitimate reason this task converges to very high accuracy quickly, on top of the small (178-image) validation set's inherent statistical noise.",
+        "IMPORTANT INFERENCE-TIME LIMITATION (not fully resolved): the training-time blur equalization (Gaussian blur sigma=1 applied ONLY to Normal-labeled images, to counter their higher native sharpness) is a LABEL-CONDITIONAL transform -- it cannot be replicated at inference time, since the true label is exactly what we are trying to predict (chicken-and-egg). inference/cataract_engine.py therefore does NOT apply any deliberate blur -- every uploaded photo is treated the way TRAINING'S CATARACT CLASS was treated (left unprocessed, native quality). A real user's photo that happens to be naturally low-quality/blurry (resembling training's PRE-blur Normal distribution, sharpness ~1012, rather than the POST-blur ~123-142 the model actually learned as 'normal') is therefore somewhat out-of-distribution relative to training -- real-world accuracy on such photos is unverified and could differ from the validation numbers above.",
+        "Training images are curated, mostly clinical-quality/advanced-case anterior segment photos collected by the dataset author via Google Image Search (copyright of individual images uncertain, accepted as a known risk for this personal, non-commercial project, plans/plan_cataract.txt section 8) -- may not represent the range of a typical smartphone self-photo (angle, lighting, focus), especially subtle/early-stage cataracts.",
+        "Requires an eye-ROI crop before classification (see inference/cataract_engine.py) since training images are already tight close-ups of a single eye; a real upload may show more face/background."
+    ]
+}

@@ -1,0 +1,305 @@
+FUNDAS_SYSTEM -- NGHIEN CUU AMD (THOAI HOA DIEM VANG), 2026-09-01
+====================================================
+Ghi lai ket qua tra cuu kha thi cho AMD (plan.txt Phase 3 con lai, muc 2.3),
+theo dung phuong phap da dung cho glaucoma: kiem tra pretrained truoc, kiem
+tra dataset that (tai anh mau xem bang mat, khong tin mo ta suong), roi moi
+ket luan. CHUA TAI DU LIEU DAY DU, CHUA TRAIN GI CA -- day la ket qua nghien
+cuu de quyet dinh huong di.
+
+
+1. TIN VUI LON: CO PRETRAINED THAT, PUBLIC DOMAIN -- DeepSeeNet (NCBI/NIH)
+----------------------------------------------------------
+Day la phat hien quan trong nhat: KHAC voi glaucoma (khong co pretrained,
+phai tu train), AMD CO 1 model pretrained that, tai duoc, tu 1 nguon rat
+dang tin cay:
+
+    Repo: github.com/ncbi-nlp/DeepSeeNet (65 sao, cap nhat lai 2025-12-29,
+    co ban DeepSeeNet+ moi hon 2025)
+    Paper: Peng et al., "DeepSeeNet: A deep learning model for automated
+    classification of patient-based age-related macular degeneration
+    severity from color fundus photographs", Ophthalmology, 2018/2019 --
+    CHINH LA model da ghi trong plan.txt muc 2.3 tu dau (khong phai phat
+    hien moi ve ten, nhung lan nay XAC NHAN CO WEIGHT TAI DUOC THAT, truoc
+    day chi ghi ten paper tham khao).
+    License: PUBLIC DOMAIN (US Government Work, NIH/NLM) -- KHONG han che
+    gi, chi yeu cau trich dan. Day la license SACH NHAT tung gap trong du
+    an nay (sach hon ca QuickQual, ORIGA, RIM-ONE...).
+    Weight tai truc tiep tu GitHub Releases (khong can Zenodo/Baidu/xin
+    quyen):
+      - v0.1: drusen_model.h5 (kich thuoc drusen: non/small, intermediate,
+        large), pigment_model.h5 (bat thuong sac to: co/khong), adv_amd_
+        model.h5 (AMD giai doan muon: co/khong)
+      - v0.2: cga_model.h5 (teo hac vong mac trung tam), ga_model.h5 (teo
+        hac vong mac)
+    Ket hop 3 model v0.1 (drusen + pigment + adv_amd) se ra DUNG thang do
+    AREDS Simplified Severity Scale (0-4/0-5) -- giong het huong ban dau
+    plan.txt muc 1.4 de xuat ("Thang do muc do tuong tu DR").
+
+    RUI RO TICH HOP (quan trong, khac han QuickQual): DeepSeeNet doi hoi
+    "python=3.6, tensorflow>=1.6.0, keras=2.2.4, Linux" -- day la stack RAT
+    CU (TF1.x/Keras 2.2.4 tu ~2018), trong khi he thong hien tai dung
+    PyTorch + timm tren Python 3.10. KHONG THE cai truc tiep vao cung 1
+    venv nhu QuickQual (chi can them scikit-learn hien dai). Can 1 trong
+    cac phuong an:
+      (a) Chuyen doi weight .h5 sang ONNX/PyTorch (kien truc trong repo la
+          CNN chuan, kha thi nhung ton cong suc chuyen doi + kiem chung lai
+          xem ket qua co khop voi ban goc khong).
+      (b) Chay DeepSeeNet nhu 1 tien trinh/microservice rieng (moi truong
+          Python 3.6 + TF1 rieng biet, goi qua API noi bo) -- tang do phuc
+          tap van hanh (2 runtime Python song song).
+      (c) Bo qua DeepSeeNet, tu train 1 model don gian (PyTorch/timm, giong
+          cach da lam voi glaucoma) tren dataset AMD/normal nhi phan --
+          MAT loi the "khong can train" nhung DONG BO kien truc voi toan
+          bo he thong con lai, khong can runtime thu 2.
+    => Day KHONG con la cau hoi "co pretrained hay khong" (CO), ma la
+       "chi phi tich hop pretrained (TF1 cu) co dang gia hon tu train
+       (PyTorch, dong bo) hay khong" -- khac han tinh huong QuickQual (Phase
+       1) noi pretrained la lua chon ro rang tot nhat.
+
+
+2. KIEM TRA MODALITY: ANH AMD CO PHAI FUNDUS TOAN CANH GIONG DR KHONG?
+   -- CO, DA XAC NHAN BANG MAT (khac vu glaucoma/cataract bi sai)
+----------------------------------------------------------
+Tai 1 anh mau that tu dataset "AMDNet23" (Kaggle, xem muc 3) va xem truc
+tiep: la ANH FUNDUS TRON DAY DU, co vien den, thay ro dia thi giac, mach
+mau, VA cac dom drusen (dau hieu AMD dac trung, nhin nhu nhung dom vang
+nhat rai rac quanh diem vang) -- DUNG dinh dang can, KHONG bi crop-zoom
+nhu ACRIMA/RIM-ONE (glaucoma), CUNG KHONG phai anh ngoai nhan cau nhu lop
+"cataract" trong bo dataset 4-lop da kiem tra truoc do.
+=> TIN TOT: AMD KHONG gap rui ro sai modality/crop nhu 2 tinh huong truoc.
+   Neu train, co the dung THANG inference/preprocessing.py hien co, khong
+   can them buoc auto-crop nhu glaucoma.
+
+
+3. DATASET: TIM DUOC NHUNG PHAT HIEN RUI RO RO RANG -- DATA LEAKAGE VOI
+   CHINH ODIR-5K DA DUNG TRAIN MULTIDISEASE
+----------------------------------------------------------
+3.1 AMDNet23 / "Macular Degeneration Disease Dataset"
+    Kaggle ref: orvile/macular-degeneration-disease-dataset
+    Nguon goc that: Mendeley Data (Ali, 2025), doi: 10.17632/yj35kjgrv3.1
+    License: CC BY 4.0 (ro rang, tot)
+    Mo ta: 2.000 anh, 4 lop can bang (Normal/Diabetes/Cataract/AMD, 400
+    anh/lop), "compiled from six public sources: Ocular Disease
+    Recognition [[= ODIR]], DR_200, Fundus Dataset, RFMiD, HRF, ARIA".
+    Da tai thu va MO ANH THAT (394/400 anh lop "amd") -- PHAT HIEN QUAN
+    TRONG: 237/394 anh (60%) co ten file dang "<so>_left.jpg" / "<so>_
+    right.jpg" -- DUNG Y HET quy uoc dat ten cua chinh ODIR-5K (patient ID
+    + mat trai/phai). Day la dau hieu RAT RO RANG cac anh nay duoc lay
+    THANG TU ODIR-5K (1 trong 6 nguon duoc liet ke).
+    => RUI RO DATA LEAKAGE THAT: model multidisease hien tai DA TUNG train
+       tren toan bo tap train ODIR-5K (bao gom ca cac anh gan nhan "amd").
+       Neu dung AMDNet23 de "kiem chung" multidisease hoac de train model
+       AMD moi, RAT CO THE mot phan anh trung/gan giong anh da nam trong
+       tap train cu -- ket qua do duoc se BI THOI PHONG (model "nhin quen"
+       anh, khong phai thuc su tong quat hoa tot). Day la loi tuong tu nhu
+       viec khong duoc danh gia model tren chinh tap da dung de train.
+       CHUA XAC MINH DUOC ty le trung lap chinh xac (khong con giu manifest
+       ODIR-5K goc de doi chieu tung ID) -- chi canh bao nguy co, khong
+       khang dinh % trung lap cu the.
+
+3.2 ARMD Curated Dataset 2023
+    Kaggle ref: rakhshandamujib/armd-curated-dataset-2023
+    License: "unknown" (Kaggle khong ghi ro, CANH BAO -- te hon ca cac
+    truong hop "other" da gap truoc day, vi it nhat "other" con co the tra
+    cuu them, "unknown" la Kaggle tu nhan khong xac dinh duoc).
+    Mo ta: 511 anh AMD, ghep tu 4 nguon: "1000 Fundus Images with 39
+    Categories", RFMiD, ARIA, VA "ODIR-2019" -- LAI CO ODIR trong danh sach
+    nguon => CUNG rui ro leakage tuong tu muc 3.1, CHUA tai kiem tra anh
+    that (dung lai o doc mo ta, vi da du bang chung tu 3.1 de canh bao
+    chung ca 2 bo).
+
+3.3 ADAM (Automatic Detection challenge on Age-related Macular degeneration)
+    -- nguon HAN LAM, DOC LAP voi ODIR-5K (khong nam trong danh sach nguon
+    cua AMDNet23/ARMD-2023 o tren)
+    1.200 anh fundus, nhan AMD + segmentation dia thi giac/ton thuong
+    (drusen, xuat huyet, seo) + toa do diem vang -- chat luong ngang REFUGE
+    (da dung tham chieu cho glaucoma).
+    Truy cap: (a) IEEE DataPort -- CAN subscription tra phi; (b) Baidu AI
+    Platform (ai.baidu.com/broad/subordinate?dataset=amd) -- cong khai
+    NHUNG thuong can tai khoan/cong cu Baidu Netdisk, kinh nghiem chung la
+    hay bi gioi han toc do/khu vuc voi nguoi dung ngoai Trung Quoc.
+    DA KIEM TRA: KHONG co mirror Kaggle nao cho ADAM (tim voi nhieu tu
+    khoa deu ra 0 ket qua) -- khac han glaucoma (ACRIMA/ORIGA/RIM-ONE deu
+    co mirror Kaggle bat ngo de dung). AMD lan nay ĐUNG NHU DU DOAN BAN
+    DAU trong plan.txt -- kho tiep can hon, KHONG co "bat ngo de" nhu
+    glaucoma.
+    => Day la nguon SACH NHAT ve leakage (khong dinh ODIR-5K) nhung kho
+       lay nhat trong 3 lua chon.
+
+
+4. TOM TAT DANH GIA
+----------------------------------------------------------
+                    Pretrained?         Dataset rieng?           Modality
+    DeepSeeNet      CO (public domain,  Tu train tren AREDS      Fundus
+                    nhung TF1/Keras cu) (rieng, kho xin) hoac     toan canh
+                                        AMDNet23 (leakage)/ADAM   (giong DR)
+                                        (sach nhung kho lay)
+
+So sanh voi glaucoma: glaucoma KHONG co pretrained nhung dataset (Kaggle)
+de lay va SACH (khong leak vao tap train nao khac). AMD thi NGUOC LAI --
+CO pretrained tot (DeepSeeNet) nhung MOI dataset de lay (Kaggle) đều dinh
+nghi ngo leakage voi chinh ODIR-5K, con dataset sach (ADAM) thi kho lay
+nhu du doan ban dau.
+
+
+5. DE XUAT HUONG DI (chua quyet, can nguoi dung chon)
+----------------------------------------------------------
+Huong A -- Dung DeepSeeNet pretrained, chap nhan chi phi tich hop TF1 cu:
+    + Uu diem: khong can train, license sach nhat tu truoc gio, models
+      chia nho theo tung dau hieu AREDS (drusen/pigment/GA) thay vi 1 con
+      so mo ho, co gia tri lam sang ro rang.
+    - Nhuoc diem: can giai quyet xung dot moi truong Python 3.6/TF1 vs
+      Python 3.10/PyTorch hien tai (chuyen doi weight HOAC chay microservice
+      rieng) -- chi phi ky thuat thuc su, chua ro mat bao lau.
+    - Van CAN dataset AMD nao do de KIEM CHUNG lai DeepSeeNet tren pipeline
+      that (giong buoc da lam cho glaucoma voi AIROGS) -- ma dataset de lay
+      nhat (AMDNet23) lai dinh nghi leakage, nen con so kiem chung co the
+      khong hoan toan doc lap/dang tin 100%.
+
+Huong B -- Tu train nhu da lam voi glaucoma (PyTorch/timm, dong bo kien
+truc), dung AMDNet23/ARMD-2023 nhung PHAI XU LY RUI RO LEAKAGE truoc:
+    + Uu diem: dong bo toan bo he thong (khong them runtime TF1), quy trinh
+      da quen (giong glaucoma).
+    - Nhuoc diem: PHAI loai bo (hoac it nhat canh bao ro) cac anh trung
+      voi ODIR-5K truoc khi dung lam TAP KIEM CHUNG (khong sao neu dung lam
+      TAP TRAIN THEM, vi luc do khong con la "kiem chung doc lap" nua ma la
+      "mo rong du lieu train" -- 2 muc dich khac nhau, can noi ro dang lam
+      cai nao). Neu chi con 40% anh (157/394) la "sach" (khong theo quy uoc
+      ODIR) thi so luong con lai co the qua it de train rieng.
+
+Huong C -- Thu xin ADAM qua Baidu (mien phi nhung phien phuc), de co 1
+    tap HOAN TOAN sach cho ca kiem chung LAN train/finetune -- CHUA thu,
+    khong ro muc do kho khan thuc te (danh gia tu xa la "thuong phien
+    phuc" nhung chua kiem chung truc tiep).
+
+Chua nghieng ve huong nao trong ban ghi nay -- de nguoi dung doc va chon,
+giong cach da lam voi Huong A/B cua glaucoma truoc day.
+
+
+6. CAP NHAT (2026-09-01, cung ngay): CHI TIET + THOI GIAN DU KIEN TUNG HUONG
+----------------------------------------------------------
+6.1 Huong C -- KIEM TRA LAI, KHONG kha thi nhu mo ta ban dau
+    Da fetch thu trang aistudio.baidu.com (noi Baidu redirect ADAM toi) --
+    nhan ve HTTP 403 Forbidden NGAY O BUOC XEM TRANG, chua noi den tai file.
+    Nghia la day la LOGIN WALL (yeu cau tai khoan Baidu tu buoc dau), KHONG
+    PHAI "cong khai nhung cham" nhu ghi nham o muc 3.3 ban dau -- can sua
+    lai nhan thuc nay.
+    Nguoi dung hoi co "tai am tham" duoc khong, vi khong public nen khong
+    lo ban quyen -- CAN PHAN BIET RO: day khong phai van de LICENSE (dung
+    sau khi co du lieu), ma la RAO CAN XAC THUC/DANG NHAP (lam sao lay
+    duoc du lieu). Khong ho tro vuot qua login wall du muc dich la ca nhan,
+    khong publish -- 2 chuyen khac nhau. Duong hop le duy nhat: tu tao tai
+    khoan Baidu qua kenh chinh thuc cua ho -- nhung tai khoan Baidu THUONG
+    YEU CAU SO DIEN THOAI TRUNG QUOC de xac minh SMS, la rao can THUC TE
+    (khong phai do gioi han tu phia toi) co the khien huong nay be tac ngay
+    tu buoc dang ky, khong lien quan quyet dinh dong y/tu choi ho tro.
+    => KET LUAN: Huong C hien loai khoi can nhac tru khi nguoi dung tu co
+       cach vao duoc Baidu (vd da co tai khoan/so dien thoai phu hop).
+
+6.2 Huong A -- Chuyen doi weight DeepSeeNet (.h5 Keras/TF1 -> PyTorch)
+    Cac buoc + uoc luong thoi gian:
+      (1) Tai 3 file .h5 (drusen/pigment/adv_amd, ban v0.1)             ~5 phut
+      (2) Dung moi truong load duoc .h5 -- thu tf.keras (TF2) truoc, neu
+          loi serialization cu (Keras 2.2.4) moi can dung dung ban cu
+          (Python 3.6 + TF1.6 + Keras 2.2.4, kha kho cai tren may hien
+          dai/Windows)                                        ~30 phut - 2 gio
+      (3) Doc code repo (thu muc deepseenet/) de biet dung backbone/input
+          size/tien xu ly goc (chua doc chi tiet code trong lan nghien
+          cuu nay, chi doc README)                              ~30 phut - 1 gio
+      (4) Dung lai kien truc tuong ung trong PyTorch/timm, map tung layer
+          weight qua -- PHAN NANG NHAT: khac thu tu truc du lieu (NHWC vs
+          NCHW), batchnorm/momentum khac convention giua Keras/PyTorch, de
+          loi am tham (load duoc nhung sai so, khong bao loi ro rang)     ~4-8 gio+
+      (5) Kiem chung: so sanh output PyTorch moi vs Keras goc tren cung
+          vai anh, phai khop gan tuyet doi                        ~1-2 gio
+      (6) Tich hop vao inference/ theo mau da co (model.py/engine.py/
+          config/endpoint)                                        ~1-2 gio
+    TONG UOC TINH: ~1-2 ngay lam viec tap trung (8-16 gio), RUI RO keo dai
+    hon neu buoc (4) vuong (code tu 2018-2019, it nguoi con maintain de
+    tham khao khi bi ket). Nguoi dung da chon di huong nay ("se theo huong
+    chuyen doi weight").
+
+6.3 Huong B -- Tu train (PyTorch/timm, lap lai dung khuon glaucoma)
+    Cac buoc + uoc luong thoi gian:
+      (1) Tai AMDNet23 qua Kaggle API (da biet cach lam)              ~15-30 phut
+      (2) Loc anh: tach cac file ten kieu "_left/_right" (nghi leak tu
+          ODIR-5K) ra khoi TAP DANH GIA DOC LAP (van dung duoc de train,
+          chi khong dung de "chung minh" do chinh xac doc lap)     ~30 phut - 1 gio
+      (3) Kiem tra luon lop "normal" cung bo co bi leak tuong tu khong, bo
+          sung nguon khac neu can                                    ~0-1 gio
+      (4) Chinh lai notebook Colab tu mau Fundas_Glaucoma_Training.ipynb
+          (doi phan tai du lieu + nhan, giu nguyen kien truc/backbone/
+          preprocessing)                                            ~1-2 gio
+      (5) Train that tren Colab GPU (dataset nho ~800-1000 anh AMD+normal,
+          tuong tu quy mo glaucoma)                          ~5-15 phut chay, +1-2 gio neu can thu lai
+      (6) Danh gia + tich hop inference theo mau (model.py/engine.py/
+          config/endpoint)                                          ~1-2 gio
+    TONG UOC TINH: ~4-8 gio (nua ngay den 1 ngay) -- NHANH HON Huong A ro
+    ret vi tai dung toan bo pipeline/kien truc da co, khong phai convert
+    framework. Nguoi dung xac nhan "tu train cung khong thanh van de".
+
+6.4 So sanh nhanh
+    Huong B nhanh hon Huong A khoang 2-3 lan, va khong dung them runtime
+    TF1 cu (giu he thong dong bo 1 framework PyTorch). Huong A cho model
+    "sach" hon ve hoc thuat (dung thang AREDS chinh thong, tung risk factor
+    rieng: drusen/pigment/GA) nhung ton cong convert va rui ro ky thuat cao
+    hon (buoc 4 co the phat sinh loi kho luong truoc). Huong C hien loai bo
+    (muc 6.1).
+
+
+7. DA TRIEN KHAI (2026-09-02) -- Huong B, CHUA validate end-to-end
+----------------------------------------------------------
+Nguoi dung chon Huong B, train tren Colab (plans/Fundas_AMD_Training.ipynb).
+Checkpoint: models/amd/model_best.pth.
+
+KET QUA TRAIN (doc tu checkpoint that):
+    val_accuracy=0.9914  val_precision=0.9825  val_recall=1.0000  val_f1=0.9911
+    (best epoch 9/25)
+
+CANH BAO NGHIEM TRONG DA PHAT HIEN KHI XEM LOG TRAIN DAY DU (Cell 7):
+  - train_loss sup do ve gan 0 (0.0001-0.0009) tu khoang epoch 12 tro di --
+    dau hieu OVERFITTING RO RET tren tap nho (~700 anh train, backbone
+    seresnext50 ~25M tham so du de "hoc thuoc" toan bo tap train).
+  - val_recall = 1.000 o 18/25 epoch lien tiep, bat ke trong so moi epoch
+    khac nhau -- bat thuong, gan giong co 1 tin hieu "de" tach 2 lop hoan
+    hao hon la mo hinh dang hoc dan dau hieu benh hoc tinh te.
+  - Breakdown theo likely_odir_source: likely_odir (n=93) f1=0.985,
+    other_source (n=23) f1=1.000 -- CA HAI deu gan hoan hao, KHONG cho
+    thay 1 nhom yeu han ro ret (lam yeu bot, nhung KHONG loai bo, gia
+    thuyet "hoc tat qua dac trung nguon"; n=23 qua nho de ket luan chac).
+  - Xem 4 anh mau that (2 amd + 2 normal trong amd_test/) thi VAN thay dau
+    hieu benh hoc that (dom drusen vang/xanh ro quanh diem vang o anh amd,
+    diem vang sach o anh normal) -- model CO THE dang hoc 1 phan tin hieu
+    that, nhung con so 99% gan chac van bi thoi phong boi (a) anh gan-
+    trung-lap giua 6 nguon khong bi hash-dedup bat duoc, (b) ca AMD trong
+    bo nay thien ve ca nang/ro ret (de phan biet hon anh thuc te), (c) tap
+    validation nho (~130-140 anh) => phuong sai thong ke cao.
+  - KET LUAN: 99.1% KHONG duoc coi la do chinh xac thuc te dang tin, tuong
+    tu (nhung nghiem trong hon) cach glaucoma tut tu 87.3% train xuong
+    77.7% end-to-end. AMD CHUA CO buoc kiem chung end-to-end nao (khac
+    glaucoma co AIROGS-light) -- xem muc 3-4, van chua tim duoc nguon sach
+    de lam viec nay.
+
+QUYET DINH NGUOI DUNG (2026-09-02): AMD KHONG PHAI tinh nang trong tam cua
+du an nay -- CHAP NHAN trien khai du CHUA validate end-to-end, khac han
+nguyen tac da giu nghiem ngat voi glaucoma. Da trien khai:
+  - config/amd/config.json -- ghi day du canh bao overfitting o tren vao
+    truong "notes", KHONG che giau muc do chua chac chan (khac muc do tin
+    tuong da co the ghi cho glaucoma sau khi validate that).
+  - inference/amd_model.py, inference/amd_engine.py -- THEM 1 buoc nguoi
+    dung yeu cau: GAMMA CORRECTION + CLAHE truoc khi vao model, vi anh
+    train (AMDNet23) da duoc chinh tac gia xu ly qua 2 buoc nay truoc khi
+    cong bo (thong so goc khong ro, dung xap xi pho bien: gamma=1.2, CLAHE
+    clipLimit=2.0 tren kenh L cua khong gian mau LAB, tileGridSize 8x8).
+    Ap dung SAU load_and_crop, TRUOC preprocess_for_backbone.
+  - inference/main.py -- engine thu 5 trong lifespan, endpoint POST
+    /amd-screen doc lap (khong gop vao /predict).
+  - scripts/validate_amd.py -- smoke test tren 10 anh amd_test/ (co nhan
+    that tu notebook) -- KET QUA: 10/10 dung, nhung n=10 la qua nho de coi
+    la validation that, chi xac nhan engine chay dung ky thuat.
+  - Da test qua HTTP that (ca 5 engine cung luc), VRAM ~4.3GB/8.1GB, khong
+    anh huong /predict (DR).
+
+VIEC CHUA LAM: web/ (Prisma, UI, router frontend) -- chi moi lam phan
+inference/ backend theo yeu cau. Con thieu buoc kiem chung end-to-end that
+(neu sau nay muon nang do tin cay len ngang glaucoma).

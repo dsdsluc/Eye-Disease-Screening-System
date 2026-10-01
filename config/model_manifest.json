@@ -1,0 +1,188 @@
+{
+  "generated_at": "2026-08-18T07:39:21.338564Z",
+  "total_models": 20,
+  "total_size_mb": 9625.63,
+  "manifest_hash": "54feccddf687d4cce21ec6cb77e23fab41b7921f9e60ded9a3e32fb77513c5ce",
+  "models": [
+    {
+      "backbone": "inception_v4",
+      "fold": 0,
+      "filename": "fold_0_best.pth",
+      "relative_path": "models/inception_v4/fold_0_best.pth",
+      "size_bytes": 494721208,
+      "size_mb": 471.8,
+      "sha256": "9f5a5a3bc4b73f81b744a9c1ce217719abd4d63aea0374f8ea81dc956adc0f3d"
+    },
+    {
+      "backbone": "inception_v4",
+      "fold": 1,
+      "filename": "fold_1_best.pth",
+      "relative_path": "models/inception_v4/fold_1_best.pth",
+      "size_bytes": 494721208,
+      "size_mb": 471.8,
+      "sha256": "7b76dafa3b19aeaf2a4616fefab716a555b4d665b21536adb42f0c62d503c1f8"
+    },
+    {
+      "backbone": "inception_v4",
+      "fold": 2,
+      "filename": "fold_2_best.pth",
+      "relative_path": "models/inception_v4/fold_2_best.pth",
+      "size_bytes": 494721208,
+      "size_mb": 471.8,
+      "sha256": "72832b98f0ecae0e9d5b468cdb595344b155d93840712f24abf833f0a707beab"
+    },
+    {
+      "backbone": "inception_v4",
+      "fold": 3,
+      "filename": "fold_3_best.pth",
+      "relative_path": "models/inception_v4/fold_3_best.pth",
+      "size_bytes": 494721208,
+      "size_mb": 471.8,
+      "sha256": "b7b60993acd785c8110f71eda654e020507cc514827d86023ef63d79e05bb962"
+    },
+    {
+      "backbone": "inception_v4",
+      "fold": 4,
+      "filename": "fold_4_best.pth",
+      "relative_path": "models/inception_v4/fold_4_best.pth",
+      "size_bytes": 494721208,
+      "size_mb": 471.8,
+      "sha256": "b0ed08f5475c09e29a5986848da4f4be2fbe727ffe80a54df5f7fd6db2798dab"
+    },
+    {
+      "backbone": "inception_resnet_v2",
+      "fold": 0,
+      "filename": "fold_0_best.pth",
+      "relative_path": "models/inception_resnet_v2/fold_0_best.pth",
+      "size_bytes": 653040163,
+      "size_mb": 622.79,
+      "sha256": "755987ec5463a08873c79155750a201c63f0ecdb2e3d4f17c099fa802017d5b4"
+    },
+    {
+      "backbone": "inception_resnet_v2",
+      "fold": 1,
+      "filename": "fold_1_best.pth",
+      "relative_path": "models/inception_resnet_v2/fold_1_best.pth",
+      "size_bytes": 653040163,
+      "size_mb": 622.79,
+      "sha256": "267b10c4d1ac5a9023940fc64305046e138610ba7ebcf92ac39f9c2c2559386e"
+    },
+    {
+      "backbone": "inception_resnet_v2",
+      "fold": 2,
+      "filename": "fold_2_best.pth",
+      "relative_path": "models/inception_resnet_v2/fold_2_best.pth",
+      "size_bytes": 653040163,
+      "size_mb": 622.79,
+      "sha256": "ef433fa8d690bc6ae8b7bb6acc7d634723e68bcd56e289813425a0d0c5ca03f1"
+    },
+    {
+      "backbone": "inception_resnet_v2",
+      "fold": 3,
+      "filename": "fold_3_best.pth",
+      "relative_path": "models/inception_resnet_v2/fold_3_best.pth",
+      "size_bytes": 653040163,
+      "size_mb": 622.79,
+      "sha256": "f0cab72a85077fea9d91518ebd80ea4d246df4c035df4e4e0b58e56c817c7bae"
+    },
+    {
+      "backbone": "inception_resnet_v2",
+      "fold": 4,
+      "filename": "fold_4_best.pth",
+      "relative_path": "models/inception_resnet_v2/fold_4_best.pth",
+      "size_bytes": 653040163,
+      "size_mb": 622.79,
+      "sha256": "49cc372f090812ca672fbea861a346075e99bb24ddb4ee2ec845f82a0f13ee52"
+    },
+    {
+      "backbone": "seresnext50_32x4d",
+      "fold": 0,
+      "filename": "fold_0_best.pth",
+      "relative_path": "models/seresnext50_32x4d/fold_0_best.pth",
+      "size_bytes": 306762968,
+      "size_mb": 292.55,
+      "sha256": "cf2736b4b9c40e29e5bfffeaa31f9354794e90c7ab7cf3920bde7d3ce47871dd"
+    },
+    {
+      "backbone": "seresnext50_32x4d",
+      "fold": 1,
+      "filename": "fold_1_best.pth",
+      "relative_path": "models/seresnext50_32x4d/fold_1_best.pth",
+      "size_bytes": 306762968,
+      "size_mb": 292.55,
+      "sha256": "5d36c7f4d9f4c69614ffda743dd0449e96e466f7acba2ff62f49348c47855361"
+    },
+    {
+      "backbone": "seresnext50_32x4d",
+      "fold": 2,
+      "filename": "fold_2_best.pth",
+      "relative_path": "models/seresnext50_32x4d/fold_2_best.pth",
+      "size_bytes": 306762968,
+      "size_mb": 292.55,
+      "sha256": "a0d11b29ce4250c55f54df16a4d2db05a050abb6252d69d6999d4709bb601278"
+    },
+    {
+      "backbone": "seresnext50_32x4d",
+      "fold": 3,
+      "filename": "fold_3_best.pth",
+      "relative_path": "models/seresnext50_32x4d/fold_3_best.pth",
+      "size_bytes": 306762968,
+      "size_mb": 292.55,
+      "sha256": "7cff83a475fdbc74f471a619a4f112e5a928c63f1d30127f03b7d5cbddb33791"
+    },
+    {
+      "backbone": "seresnext50_32x4d",
+      "fold": 4,
+      "filename": "fold_4_best.pth",
+      "relative_path": "models/seresnext50_32x4d/fold_4_best.pth",
+      "size_bytes": 306762968,
+      "size_mb": 292.55,
+      "sha256": "4dfebf0f43151d1e7a17127557cab4ce4d3021e744a1c7aeb17d9eafec031489"
+    },
+    {
+      "backbone": "seresnext101_32x4d",
+      "fold": 0,
+      "filename": "fold_0_best.pth",
+      "relative_path": "models/seresnext101_32x4d/fold_0_best.pth",
+      "size_bytes": 564116287,
+      "size_mb": 537.98,
+      "sha256": "22b712f9e4edfd12183ddbe48d2e09a275fcdb59a7e8c639c82d0ce48ebfd3fe"
+    },
+    {
+      "backbone": "seresnext101_32x4d",
+      "fold": 1,
+      "filename": "fold_1_best.pth",
+      "relative_path": "models/seresnext101_32x4d/fold_1_best.pth",
+      "size_bytes": 564116351,
+      "size_mb": 537.98,
+      "sha256": "b063859dd674778a9a2307abe65e0e192997e9baddc327cb6751e7308f0bbdb3"
+    },
+    {
+      "backbone": "seresnext101_32x4d",
+      "fold": 2,
+      "filename": "fold_2_best.pth",
+      "relative_path": "models/seresnext101_32x4d/fold_2_best.pth",
+      "size_bytes": 564116287,
+      "size_mb": 537.98,
+      "sha256": "61e4f2f3744338c7d8708a05a8217b8a2a40c0f49df098488ef333e21a0f08a0"
+    },
+    {
+      "backbone": "seresnext101_32x4d",
+      "fold": 3,
+      "filename": "fold_3_best.pth",
+      "relative_path": "models/seresnext101_32x4d/fold_3_best.pth",
+      "size_bytes": 564116287,
+      "size_mb": 537.98,
+      "sha256": "c3fb5c12aa95bff96c6930e8679c498508314732c60daf553117b9eebdeec34a"
+    },
+    {
+      "backbone": "seresnext101_32x4d",
+      "fold": 4,
+      "filename": "fold_4_best.pth",
+      "relative_path": "models/seresnext101_32x4d/fold_4_best.pth",
+      "size_bytes": 564116287,
+      "size_mb": 537.98,
+      "sha256": "44cc02e48cf7a2f4ad546f1f9055fc8209c6a0fabe46000c9836a7166c753c67"
+    }
+  ]
+}

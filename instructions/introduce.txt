@@ -1,0 +1,274 @@
+GIOI THIEU HE THONG FUNDAS - TANG INFERENCE (FastAPI) VA TANG WEB (Next.js)
+============================================================================
+(Kiem tra truc tiep tu code + config.json thuc te ngay 2026-09-20, khong doan)
+
+
+PHAN 1: TANG INFERENCE (FastAPI, port 8000, inference/main.py)
+==================================================================
+Mot tien trinh Python duy nhat, giu 7 model thuong tru trong VRAM (~5GB/8GB
+GPU), load 1 lan luc khoi dong (~60-90s), tai su dung cho moi request.
+Khong luu tru gi (khong DB, khong Cloudinary) -- chi nhan anh, tra ket qua.
+Toan bo 7 model deu la seresnext50_32x4d hoac tuong duong (rieng DR
+ensemble dung 4 backbone khac nhau).
+
+
+1. DR ENSEMBLE (model chinh, "Fundas · Cham diem vong mac")
+--------------------------------------------------------------
+  - Nhiem vu: Cham do Diabetic Retinopathy (Vong mac tieu duong), 5 muc do
+    (0=Khong benh -> 4=Rat nang, "Proliferative DR").
+  - Kien truc: ENSEMBLE 4 backbone (inception_v4, inception_resnet_v2,
+    seresnext50_32x4d, seresnext101_32x4d) x 5 fold moi backbone = 20 model
+    con, ket hop bang weighted average + threshold toi uu theo QWK
+    (Quadratic Weighted Kappa).
+  - Day la model duy nhat co do phuc tap/quy mo train lon nhat he thong,
+    va la model DUY NHAT co san Grad-CAM explain (endpoint /explain) --
+    ve heatmap vung anh huong den quyet dinh cua model.
+  - Endpoint: POST /predict (cham diem), POST /explain (heatmap PNG base64).
+  - Trang thai: San pham chinh, khong ghi "is_experimental" trong response
+    (khac voi 5 model chuyen biet ben duoi, tat ca deu la "specialist
+    screen" bo sung, co disclaimer "experimental").
+
+
+2. CLIP MODALITY GATE (lop gac ngoai cung, khong phai model chan doan)
+--------------------------------------------------------------------------
+  - Nhiem vu: KHONG cham benh -- chi kiem tra loai anh co dung khong TRUOC
+    khi cho vao bat ky model nao khac. Vi du: anh chup mat ngoai gui nham
+    vao /predict (dang cho anh day mat) se bi chan o day, khong bao gio
+    toi duoc DR ensemble.
+  - Ky thuat: CLIP zero-shot (open_clip, ViT-B-32/openai, KHONG train rieng
+    -- chi so sanh embedding anh voi vai cau mo ta van ban cho 3 nhom:
+    "fundus" (day mat), "external_eye" (mat ngoai), "other" (khong lien
+    quan mat).
+  - Ap dung cho CA 7 endpoint nhan anh: 6 endpoint doi anh fundus
+    (predict/explain/quality-check/multidisease/glaucoma/amd) va 2 endpoint
+    cataract (crop-preview + screen, doi anh mat ngoai).
+  - Chan cung (HTTP 422) neu sai loai anh, khong co canh bao mem.
+  - Chua duoc calibrate bang bo du lieu nhan tay chinh thuc -- chi test
+    tren vai chuc anh that (xem config/modality_gate/config.json).
+
+
+3. QUALITY GATEKEEPER -- "QuickQual" (kiem tra chat luong anh)
+--------------------------------------------------------------------
+  - Nhiem vu: Danh gia anh fundus co du "Tot / Dung duoc / Kem" de doc hay
+    khong (dua vao do net, anh sang, che khuat...).
+  - Ky thuat: DenseNet121 (dong bang, chi trich xuat dac trung) + bo phan
+    loai SVM co san cua tac gia goc (khong tu train), phuong phap QuickQual
+    (Engelmann & MacGillivray, 2023).
+  - Endpoint rieng: POST /quality-check (web goi rieng de LUU nhan chat
+    luong vao DB, khong chan gi ca -- gate_mode=fail_open).
+  - Cung duoc nhung (embedded) vao 5 endpoint fundus khac de LOG canh bao
+    server-side neu chat luong kem -- nhung KHONG con chan cung nua (da bo
+    theo quyet dinh 2026-09-06: qua nhay, tung chan oan mot anh DR that
+    hop le; viec danh gia chat luong du de doc hay khong nen de bac si
+    quyet dinh, khong phai automation).
+  - License: tac gia goc khong cong bo license ro rang -- CHI dung ca nhan/
+    phi thuong mai, khong duoc phan phoi lai.
+
+
+4. MULTI-DISEASE SCREENING (sang loc 8 nhom benh)
+--------------------------------------------------------------------
+  - Nhiem vu: Sang loc dong thoi 8 nhom: normal, diabetes, glaucoma,
+    cataract, amd, hypertension, myopia, other -- tu MOT anh fundus.
+  - Dataset: ODIR-5K (Kaggle, andrewmvd/ocular-disease-recognition-odir5k).
+  - Do chinh xac: val_accuracy = 62.2%, val_macro_f1 = 58.1% -- THAP hon
+    han DR ensemble, la bo phan loai single-label 8-lop (khong phai
+    multi-label du mot mat co the co nhieu benh cung luc).
+  - Endpoint: POST /multidisease-screen. Tinh nang doc lap, khong tu dong
+    chay chung voi /predict -- nguoi dung phai bam chon rieng.
+  - Trang thai: "is_experimental": true, ro rang la sang loc bo sung THAM
+    KHAO, khong phai ket qua chan doan.
+
+
+5. GLAUCOMA SPECIALIST (chuyen sau ve Tang nhan ap/Glaucoma)
+--------------------------------------------------------------------
+  - Nhiem vu: Phan loai nhi phan normal/glaucoma, chuyen sau hon multi-
+    disease cho benh nay.
+  - Dataset: gop 3 nguon (ACRIMA, ORIGA, RIM-ONE), toan la anh DA CROP SAN
+    quanh dia thi giac (optic disc) -- KHONG phai anh fundus toan canh.
+  - Vi vay inference/glaucoma_engine.py phai TU DONG dinh vi + crop vung
+    dia thi giac truoc khi cham (dung fundus_image_toolbox, model
+    efficientnet-b3 rieng tai ve tu Zenodo, cache local o
+    ~/AppData/Local/fundus_image_toolbox).
+  - Do chinh xac tren anh da crop san (val, khong thuc te): f1=87.3%.
+  - Do chinh xac THUC TE end-to-end (anh fundus toan canh that + tu dong
+    crop): accuracy=77.0%, f1=77.7% -- do bang scripts/validate_glaucoma_e2e.py
+    tren 770 anh that, GIAM ~10 diem so voi so lieu val -- day la chi phi
+    that cua buoc tu dong crop, da duoc do that, khong phai doan.
+  - Tham so crop (od_crop_fraction=0.20) da duoc sweep thu nhieu gia tri
+    tren tap validation rieng de chon toi uu, khong phai chon boi mat.
+  - Endpoint: POST /glaucoma-screen. Doc lap, co the goi tu ket qua
+    multi-disease (nut "Phan tich chuyen sau") hoac chay rieng.
+
+
+6. AMD SPECIALIST (Thoai hoa diem vang)
+--------------------------------------------------------------------
+  - Nhiem vu: Phan loai nhi phan normal/amd.
+  - Dataset: AMDNet23 (~900 anh, gop 6 nguon nho).
+  - Tien xu ly: Gamma correction (1.2) + CLAHE truoc khi cham, de khop voi
+    cach anh training da duoc xu ly.
+  - Do chinh xac val: 99.1% f1 -- nhung CANH BAO RO trong chinh
+    config/amd/config.json: day la dau hieu OVERFITTING kinh dien (train
+    loss ve gan 0 tu epoch 12, val_recall dinh o 1.0 suot 18/25 epoch, tren
+    tap du lieu nho/nhieu nguon trung lap tiem an). SO NAY GAN NHU CHAC
+    CHAN THOI PHONG, khong phan anh do chinh xac thuc te.
+  - Day la model DUY NHAT trong 6 model chuyen biet CHUA duoc validate
+    end-to-end tren du lieu doc lap (khac glaucoma da co e2e that) -- ly do:
+    khong tim duoc bo du lieu AMD nao rieng biet, khong trung ODIR-5K.
+  - Endpoint: POST /amd-screen. Trien khai theo quyet dinh ro rang cua
+    nguoi dung du chua du tin cay cao, vi day khong phai tinh nang uu tien.
+
+
+7. CATARACT SPECIALIST (Duc thuy tinh the -- model DUY NHAT khong dung anh
+   fundus)
+--------------------------------------------------------------------
+  - Nhiem vu: Phan loai nhi phan normal/cataract, TU ANH CHUP MAT NGOAI
+    (nhu anh selfie can canh), khac hoan toan 6 model con lai (tat ca deu
+    doi anh soi day mat).
+  - Dataset: Kaggle orvile/eye-diseases-classification, anh can canh 1 mat.
+  - Buoc rieng: Tu dong nhan dien khuon mat + khoanh vung mat bang YuNet
+    (cv2.FaceDetectorYN, KHONG phai Haar cascade -- ban opencv-python cai
+    trong may nay (5.0.0) da bo cv2.CascadeClassifier).
+  - Luong "xac nhan crop truoc khi phan tich" (xay dung 2026-09-06):
+      1) POST /cataract-crop-preview -- chi crop, tra anh da crop (PNG
+         base64) cho web hien thi, CHUA phan loai.
+      2) Nguoi dung xac nhan tren giao dien -> POST /cataract-screen voi
+         co already_cropped=true -- phan loai TRUC TIEP tren anh da duoc
+         duyet, KHONG chay lai YuNet lan 2 (tranh 2 lan detect ra 2 vung
+         khac nhau).
+  - Do chinh xac val: 100% (f1=1.0) -- nhung config.json ghi ro day la
+    "yellow flag": phien ban dau tien (v1) bi loi shortcut-learning (can
+    bang sai theo do phan giai pixel thay vi do net thuc te), sua lai (v2,
+    dang dung) giam duoc ty le chenh lech do net giua 2 lop tu 4.45x xuong
+    2.10x nhung CHUA VE HET 1x -- van con nghi van residual.
+  - Gioi han quan trong CHUA giai duoc: buoc lam mo anh "normal" luc train
+    (de sua shortcut) la bien doi theo NHAN, khong the lam lai luc du doan
+    that (vi nhan la thu dang can du doan) -- anh that mo tu nhien co the
+    bi lech phan phoi so voi luc train.
+  - Endpoint: POST /cataract-crop-preview, POST /cataract-screen.
+  - AN TOAN LUONG (2026-09-06): them threading.Lock() quanh YuNet detector
+    dung chung -- nghi van (chua xac nhan) day la nguyen nhan 1 lan crash
+    toan tien trinh khong co traceback, do cv2.dnn Net co the khong an toan
+    khi nhieu request goi dong thoi.
+
+
+BAO VE HA TANG (khong phai model, ap dung toan tang inference)
+--------------------------------------------------------------------
+  - Gioi han kich thuoc file: 20MB, chan bang middleware doc header
+    Content-Length TRUOC khi doc bat ky byte nao cua body (them
+    2026-09-06, sau khi phat hien ban vá dau chi chan duoc SAU khi da
+    nhan het file vao dia).
+  - Moi loi xu ly anh (file hong, khong doc duoc...) deu duoc bat va tra
+    ve 400 ro rang thay vi 500 trong khong co thong tin (_run_engine
+    wrapper, them 2026-09-02).
+  - Server KHONG tu dong khoi dong lai khi crash/tat -- da thu giai phap
+    Windows Scheduled Task tu-restart (hoat dong that, verify 3 lan) nhung
+    nguoi dung chu dong quyet dinh go bo, van bat thu cong moi lan can dung.
+
+
+PHAN 2: TANG WEB (Next.js 16 App Router, port 3000, web/)
+==================================================================
+Khong goi truc tiep tang inference tu trinh duyet -- moi request di qua
+API route cua chinh Next.js (web/src/app/api/*), route do moi goi sang
+FastAPI (INFERENCE_URL). Luu du lieu vao Postgres (Neon, qua Prisma) +
+anh vao Cloudinary (chi khi da dang nhap).
+
+
+A. TRANG DANH CHO BENH NHAN (patient-facing)
+--------------------------------------------------------------------
+  /upload         - Trang chinh: cham DR (goi /predict + /quality-check
+                    song song), luu thanh 1 "Scan" neu da dang nhap.
+  /multidisease   - Sang loc 8 nhom benh (co the tai su dung anh tu 1 Scan
+                    da co, khong bat upload lai).
+  /glaucoma       - Chuyen sau Glaucoma (co the goi tu ket qua multidisease
+                    hoac chay doc lap).
+  /amd            - Chuyen sau AMD, panel ket qua rieng theo nguong xac
+                    suat (5 bac mau sev-0..sev-4), khong hien phan tram
+                    tho (da biet la thoi phong).
+  /cataract       - Duy nhat KHONG dung anh fundus. Ho tro 2 cach dua anh
+                    vao: tai file HOAC mo camera thiet bi chup truc tiep
+                    (getUserMedia, xay dung 2026-09-04) -- sau do BAT BUOC
+                    qua man hinh "xac nhan vung mat da khoanh" truoc khi
+                    moi thuc su phan tich (xay dung 2026-09-06).
+  /history        - Lich su tat ca lan sang loc cua nguoi dung (Scan +
+                    4 loai Screening).
+  /account        - Thong tin ca nhan.
+  /login, /register - Dang nhap/dang ky. Khach (chua dang nhap) van dung
+                    duoc moi tinh nang sang loc, chi khong duoc LUU lai
+                    (AnonymousSaveNudge nhac dang ky de luu).
+  /results/[imageId] - Xem lai 1 Scan da luu.
+
+
+B. TRANG DANH CHO BAC SI (doctor-facing, /doctor/*)
+--------------------------------------------------------------------
+  /doctor              - "Ban kham", trang tong quan.
+  /doctor/queue         - "Hang doi" cac ca can xu ly.
+  /doctor/patients      - Danh sach + ho so tung benh nhan (/[id]).
+  /doctor/new-case      - Bac si tao ho so benh nhan vang lai (khong can
+                    dang nhap cua ho) + Scan dau tien trong 1 request.
+  /doctor/case/[id]     - Xem/chot danh gia 1 ca DR (DoctorReview).
+  /doctor/screening/[id] - Xem/chot danh gia 1 ca multi-disease
+                    (ScreeningReview).
+  /doctor/glaucoma/[id], /doctor/cataract/[id] - Xem/chot danh gia rieng
+                    cho tung loai (GlaucomaReview, CataractReview) --
+                    dong vong lap bac si <-> benh nhan cho tung chuyen khoa.
+  /doctor/profile       - Ho so ca nhan bac si (CV, chuyen khoa...).
+  Luu y: chua co phan quyen role=="doctor" thuc su -- bat ky session dang
+  nhap nao cung dung duoc cac trang nay (giai doan 1, ghi ro trong code).
+
+
+C. CAU TRUC DU LIEU CHINH (Prisma, Postgres)
+--------------------------------------------------------------------
+  User                  - Tai khoan (benh nhan/bac si dung chung 1 bang,
+                    phan biet qua field "role"). Email/mat khau la optional
+                    (ho tro benh nhan vang lai do bac si tao, khong dang
+                    nhap duoc).
+  Scan                  - 1 lan cham DR (grade, score, qualityLabel...).
+  MultidiseaseScreening, GlaucomaScreening, AmdScreening, CataractScreening
+                    - Moi loai sang loc chuyen biet co bang RIENG (khong
+                    gop chung voi Scan) -- vi moi model co canh bao/do tin
+                    cay khac nhau, khong duoc de lam nguoi dung nham la
+                    "cung muc do dang tin" voi Scan.grade.
+  DoctorReview, ScreeningReview, GlaucomaReview, CataractReview - Danh gia
+                    cua bac si cho tung loai sang loc tuong ung, 1-1 voi
+                    ban ghi goc, LUON la bo sung ben canh ket qua AI, khong
+                    bao gio ghi de len.
+
+
+D. DANH SACH API ROUTE (web/src/app/api/*)
+--------------------------------------------------------------------
+  /api/scans                - POST tao Scan moi (cham DR + quality-check).
+  /api/multidisease          - POST sang loc 8 nhom (nhan file MOI hoac
+                    scanId de dung lai anh cu).
+  /api/glaucoma               - POST chuyen sau glaucoma (nhan file MOI
+                    hoac multidiseaseScreeningId).
+  /api/amd                    - POST chuyen sau AMD.
+  /api/cataract               - POST phan loai cataract (ho tro co
+                    alreadyCropped/eyeCropApplied cho luong xac nhan crop).
+  /api/cataract/crop-preview  - POST rieng, chi tra ve anh da crop de xac
+                    nhan, chua phan loai.
+  /api/doctor/*               - Cac thao tac phia bac si (tao ca moi, xem
+                    hang doi, chot danh gia...).
+  /api/auth                   - Dang nhap/dang ky/dang xuat.
+  Tat ca route nhan file upload deu co gioi han 20MB rieng (khop voi tang
+  inference), chan ngay tu header Content-Length truoc khi doc form data
+  (them 2026-09-06, vi ban vá ben inference KHONG bao ve duoc tang web).
+
+
+TOM TAT NHANH: 7 MODEL, 1 CHINH + 5 CHUYEN BIET + 1 GAC CONG
+==================================================================
+  Model                Do tin cay thuc te      Da validate that chua?
+  ------------------- ---------------------- ---------------------------
+  DR Ensemble          San pham chinh          Co (san pham chinh, khong
+                                                   gan nhan "experimental")
+  Glaucoma             Kha (f1 e2e = 77.7%)    Co, e2e that tren 770 anh
+  Multi-disease        Trung binh (f1=58.1%)   Chi validation set, chua e2e
+  Cataract             Chua ro (val f1=1.0     Chi validation set, con
+                        nhung nghi shortcut)      nghi van shortcut-learning
+  AMD                  Rat khong chac chan     Chua -- nghi van overfitting
+                        (val f1=99.1% nhung       ro trong chinh config
+                        gan chac la thoi phong)
+  Quality Gatekeeper   Ho tro/canh bao         Dung nguyen model tac gia
+                                                   khac, khong tu train
+  CLIP Modality Gate   Ho tro/gac cong         Test tren vai chuc anh,
+                                                   chua co bo validation
+                                                   chinh thuc

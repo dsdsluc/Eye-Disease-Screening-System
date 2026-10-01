@@ -1,0 +1,247 @@
+FUNDAS_SYSTEM -- ROADMAP MO RONG NGOAI DR GRADING
+====================================================
+Ghi lai ket qua nghien cuu (2026-08-29) ve cac model/dataset benh mat cong khai
+co the bo sung vao he thong, de Fundas_System khong con gioi han o cham diem
+vong mac tieu duong (DR) ma tro thanh nen tang sang loc mat da benh.
+
+Boi canh: he thong hien tai (xem plans/archetechture.txt) chi lam 1 task duy
+nhat -- DR grading tu 1 anh day (fundus) 224x224, qua ensemble 4 backbone
+(inception_v4, inception_resnet_v2, seresnext50_32x4d, seresnext101_32x4d) x
+5 fold = 20 model timm, cong voi trong so hoc duoc.
+
+
+1. SHORTLIST UU TIEN (gia tri/cong suc tich hop tot nhat)
+----------------------------------------------------------
+(1) Danh gia chat luong anh fundus (image quality / gradability) -- GATEKEEPER
+    - Ly do uu tien cao nhat: rui ro thap, tan dung 100% pipeline san co
+      (load_and_crop, preprocess_for_backbone khong doi).
+    - Chi can 1 backbone nhe (khong can ensemble 20 model), phan loai
+      Good/Usable/Reject truoc khi dua anh vao pipeline DR.
+    - Dataset: EyeQ (tap con EyePACS gan nhan lai, ~28.8k anh, 3 lop).
+    - Model tham khao: FundusQ-Net (regression), FGR-Net
+      (github.com/saifalkhaldiurv/FGR_Net).
+
+(2) Sang loc Glaucoma (phien ban phan loai, KHONG phai segmentation CDR)
+    - Cung mau kien truc voi DR hien tai: 1 anh fundus -> 1 diem so/nguong
+      -> nhan glaucoma/khong. Co the tai su dung nguyen class DRModel voi
+      head moi.
+    - Dataset cong khai: ORIGA (650 anh), ACRIMA (705 anh), RIM-ONE,
+      REFUGE/REFUGE2 (1200-2000 anh, qua IEEE DataPort / grand-challenge.org).
+    - Phien ban CDR (cup-to-disc ratio) can segmentation (U-Net) -- phuc tap
+      hon nhieu, xep sau trong roadmap (xem muc 2.6).
+
+(3) Phan loai da benh tren 1 anh (multi-label) -- ODIR-5K hoac RFMiD
+    - Gia tri lon nhat tren moi don vi cong suc: 1 lan train/fine-tune moi
+      backbone them 1 head multi-label (sigmoid) la phu duoc nhieu benh
+      cung luc (glaucoma, AMD, dau hieu duc thuy tinh the, tang huyet ap
+      vong mac, DR...) thay vi 20 model rieng cho tung benh.
+    - ODIR-5K: 5.000 benh nhan, cap mat trai/phai, 8 nhan (Beijing
+      Ophthalmology and Optometry Institute).
+    - RFMiD: 3.200 anh, 46 benh, 3 loai may chup (Kaggle).
+    - Day la huong "tan dung kien truc hien tai gan nhu nguyen ven" ro nhat:
+      cung input 224x224, cung ho backbone timm, chi doi head cuoi.
+
+(4) Phan do AMD (Age-related Macular Degeneration)
+    - Thang do muc do tuong tu DR (ordinal 0-4 hoac 9-step AREDS scale) --
+      gan giong bai toan DR nhat ve mat ky thuat.
+    - Rao can chinh: dataset chuan (AREDS, 59.302 anh) bi khoa quyen truy
+      cap qua dbGaP (phai xin phep). Thay the mo hon: HYAMD (PhysioNet).
+    - Model tham khao: DeepSeeNet (arxiv.org/pdf/1811.07492), ensemble CNN,
+      QWK ~0.92 tren phan loai 13 lop.
+
+
+2. DANH SACH DAY DU CAC UNG VIEN DA KHAO SAT
+----------------------------------------------------------
+2.1 Danh gia chat luong anh (gatekeeper)
+    Modality: fundus (giong anh dau vao hien tai)
+    Dataset/model: EyeQ; FundusQ-Net; FGR-Net (github)
+    Do phuc tap: CNN nho (ResNet/EfficientNet), 3 lop hoac 1 head regression
+    Ghi chu tich hop: chay TRUOC buoc load_and_crop (tren anh goc chua crop),
+    hau nhu khong doi preprocessing.
+
+2.2 Sang loc Glaucoma (phan loai)
+    Modality: fundus
+    Dataset: ORIGA, ACRIMA, RIM-ONE, DRISHTI-GS1, REFUGE/REFUGE2
+    Do phuc tap: CNN phan loai nhi phan -- fit gan nhu nguyen ven kien truc
+    DR hien tai (regression/threshold -> grade).
+    Ghi chu: neu lam theo huong segmentation dia thi/cup (CDR >= 0.65 la
+    dau hieu) thi can kien truc khac han (U-Net), xem muc 2.6.
+
+2.3 Phan do AMD
+    Modality: fundus
+    Dataset: AREDS (khoa quyen, dbGaP), HYAMD (PhysioNet, mo)
+    Model: DeepSeeNet (ensemble CNN)
+    Do phuc tap: tuong tu DR grading (ordinal severity regression)
+    Ghi chu: gan nhat ve mat ky thuat voi bai toan DR dang co, nhung dataset
+    kho xin hon.
+
+2.4 Duc thuy tinh the (Cataract) -- CANH BAO MODALITY KHAC
+    Modality: anh den khe (slit-lamp) / anh phan chieu vong (retro-
+    illumination) -- KHONG PHAI anh fundus tieu chuan dang dung.
+    Dataset: bo du lieu slit-lamp (1.335 slit-lamp + 637 retro-illumination,
+    cham diem LOCS III), ensemble ResNet18/WideResNet50-2/ResNeXt50.
+    Do phuc tap: ensemble ResNet/ResNeXt -- kien truc gan giong hien tai,
+    nhung INPUT KHAC (can may chup slit-lamp va luong upload/UI rieng).
+    Phuong an fundus-proxy (dung do mo anh de doan duc thuy tinh the) co
+    ton tai nhung do tin cay thap hon, nen chi dung nhu "flag" tham khao,
+    khong phai chan doan chinh.
+
+2.5 Vong mac do tang huyet ap (Hypertensive retinopathy)
+    Modality: fundus
+    Dataset: BRSET (16.266 anh, multi-label, Brazil), OIA-ODIR, CGI-HRDC
+    Model: Swin-L ViT (AUC 0.81/F1 0.97 tren BRSET) hoac MA-DNet (DenseNet,
+    95.8% acc tren OIA-ODIR)
+    Ghi chu: fit truc tiep vao mau phan loai hien tai nhung dataset chuyen
+    biet con it/yeu hon glaucoma/AMD -- nen lam nhu 1 head trong model
+    multi-label (muc 1.3) thay vi model rieng.
+
+2.6 Phan doan mach mau vong mac (Vessel segmentation) -- TASK HO TRO
+    Modality: fundus
+    Dataset: DRIVE, CHASE_DB1, STARE (bo nho, kinh dien)
+    Model co san trong luong: SA-UNet (github.com/clguo/SA-UNet),
+    SGL-Retinal-Vessel-Segmentation (github.com/SHI-Labs/..., SOTA
+    DRIVE/CHASE, co pretrained)
+    Do phuc tap: U-Net (khac han timm classifier hien tai) -- can class
+    model moi + output dang mask, khong phai diem so.
+    Ghi chu: nen dung nhu buoc ho tro/QA (vd kiem tra do net mach mau lam
+    dau vao cho CDR) hon la 1 tinh nang chan doan doc lap hien thi cho
+    nguoi dung cuoi.
+
+2.7 Foundation model thay the (huong dai han)
+    Modality: fundus VA OCT
+    Model: RETFound (github.com/rmaphoh/RETFound) -- ViT-Large pretrain
+    tu-giam-sat (MAE/DINOv2) tren 1.6 trieu anh vong mac, weight co san tren
+    HuggingFace, fine-tune duoc cho nhieu task ha nguon.
+    Do phuc tap: ViT-Large -- nang hon 4 backbone CNN dang dung.
+    Ghi chu: thay vi them 1 backbone CNN + 20 model moi cho MOI benh, co the
+    chuyen dan sang 1 encoder nen dung chung + head nhe cho tung task --
+    mo duong ho tro ca OCT sau nay ma khong can pipeline train tu dau lan 2.
+
+
+3. TAC DONG KIEN TRUC (xem chi tiet o plans/archetechture.txt muc 9)
+----------------------------------------------------------
+- Nhom "fit gan nhu nguyen ven" (phan loai/regression 1 anh 224x224): image
+  quality, glaucoma (ban phan loai), AMD, hypertensive retinopathy, va
+  multi-label ODIR/RFMiD -- deu dung chung load_and_crop/
+  preprocess_for_backbone va mau "N backbone x N fold + trong so ensemble"
+  dang co. Toi uu vmap-batched-forward (xem archetechture.txt muc 7.2) ap
+  dung duoc ngay cho bat ky task moi nao theo mau nay.
+
+- Nhom "can nang luc moi" (segmentation): glaucoma-qua-CDR va vessel
+  segmentation can kien truc U-Net + output dang mask, khac han
+  DRModel/regressor hien tai -- day la khoi luong cong viec lon hon han so
+  voi them 1 task phan loai.
+
+- Modality khac (cataract that su, qua slit-lamp): KHONG the gan vao luong
+  "upload 1 anh fundus" hien tai ma khong lam nguoi dung hieu nham anh can
+  chup. Can luong capture/UI rieng neu lam that.
+
+- Canh bao ve VRAM/scale: neu moi benh moi lai nhan ban kieu "4 backbone x
+  5 fold = 20 model rieng" nhu DR hien tai, VRAM se tang tuyen tinh theo so
+  benh (hien da dung gan het ~7.4GB cho rieng DR). Huong ben vung hon la (a)
+  train 1 model multi-label dung chung backbone cho nhieu benh cung luc
+  (muc 1.3/2.5), hoac (b) chuyen dan sang 1 foundation-model encoder dung
+  chung (muc 2.7) voi head nhe rieng cho tung task, thay vi nhan N x 20
+  model doc lap.
+
+
+4. DE XUAT THU TU TRIEN KHAI (neu quyet dinh lam)
+----------------------------------------------------------
+Phase 1 (rui ro thap, tan dung ha tang co san):
+  - Them task "image quality gatekeeper" (muc 2.1) truoc pipeline DR.
+  - [DA TRIEN KHAI, 2026-08-29] Xem plans/archetechture.txt muc 10 cho chi
+    tiet. KHONG tu train -- dung lai pretrained "QuickQual" (DenseNet121
+    dong bang + SVM cua ho, train tren EyeQ that) tai truc tiep tu GitHub.
+    Luu y: file .pkl cua ho khong co license, chi chap nhan dung vi du an
+    nay la LOCAL/CA NHAN (nguoi dung da xac nhan khong kinh doanh) -- xem
+    lai muc 10.2 truoc khi thuong mai hoa. Con thieu: tich hop web/ va tap
+    kiem thu co nhan chat luong THAT (chua co trong repo).
+Phase 2 (mo rong da benh, dung chung kien truc):
+  - Train 1 model multi-label tren ODIR-5K/RFMiD (muc 1.3) de co baseline
+    nhanh cho glaucoma/AMD/tang huyet ap vong mac/DR trong 1 lan.
+  - [DANG TRIEN KHAI, 2026-08-29] Khac voi Phase 1, LAN NAY DA TRA CUU KY
+    NHUNG KHONG TIM DUOC pretrained dang tin cay cho bai toan multi-disease
+    ODIR-5K/RFMiD (kiem tra qua GitHub API + HuggingFace, giong dung cach
+    lam voi Phase 1):
+      + Cac repo GitHub (dduwa, hamdiibnizhar, iamshubham1704,
+        riadd.aucmedi, Retinal-NeuralNET...) DEU chi co code/notebook,
+        KHONG co release/file weight nao.
+      + HuggingFace co vai model that (Isaskar/dinov2-base-ODIR-5K --
+        license Apache-2.0 tot, NHUNG chi phan biet 2 lop diabetes/normal,
+        thua so voi ensemble DR 20-model dang co, acc cung chi 71.9%).
+      + ezejiemmanuel/vit-retina-multidisease-odir5k dung 8 lop ODIR-5K
+        that, nhung KHONG license, KHONG README, KHONG so lieu eval, tai
+        khoan ca nhan moi tao, chi 3 luot tai -- qua rui ro de tin tuong.
+      + iamsiamhossen/dualeyenet-asl-odir chi co file .pth, khong co code
+        kien truc di kem -- khong the load dung.
+    => Ket luan: PHAI TU TRAIN cho Phase 2, dung nhu du kien ban dau cua
+       muc nay (khac voi Phase 1 noi tim duoc QuickQual lam tat ca).
+  - Da tai ODIR-5K that qua Kaggle API (nguoi dung cung cap kaggle.json,
+    dataset andrewmvd/ocular-disease-recognition-odir5k, ~14.4K anh) vao
+    data/odir5k_raw/.
+  - PHAT HIEN VE NHAN quan trong khi kiem tra file full_df.csv (file nhan
+    do cong dong tao san, di kem dataset): cot `target`/`labels` la nhan
+    THEO TUNG MAT (suy tu chinh tu khoa chan doan cua mat do), KHAC voi cot
+    N/D/G/C/A/H/M/O goc la nhan THEO BENH NHAN (gop ca 2 mat) -- 2 loai
+    nhan nay LECH NHAU O 27% SO DONG. Dung cot patient-level truc tiep se
+    gan nham benh cua mat nay sang mat kia (vd mat trai bi cataract nhung
+    mat phai binh thuong van bi gan nham "cataract"). Da chon dung
+    `target`/`labels` (per-eye) de tranh loi nay.
+  - PHAT HIEN THU HAI: moi dong trong `labels` chi co DUNG 1 nhan (khong co
+    dong nao co 2+ nhan cung luc), tuc la ban full_df.csv nay da don gian
+    hoa tin hieu multi-label that cua ODIR-5K thanh 1 nhan-troi-nhat moi
+    mat. Vi vay model dang train la PHAN LOAI DON NHAN 8 LOP (single-label,
+    8-way), KHONG PHAI multi-label sigmoid that su nhu du kien ban dau o
+    muc 1.3/2.2 -- van dung "baseline nhanh" nhu Phase 2 de ra, nhung can
+    hieu ro day khong phai multi-label calibrated.
+  - Kien truc: 1 backbone timm (seresnext50_32x4d, dung lai backbone da co
+    trong DR) + 1 head Linear 8 lop, KHONG ensemble (khac DRModel).
+    Split train/val THEO PATIENT ID (khong theo tung anh mat) de tranh 2
+    mat cung 1 benh nhan roi vao 2 phia train/val. Loss CrossEntropy co
+    trong so nghich dao tan suat lop (class imbalance: N=2873 vs H=128,
+    lech ~22 lan).
+  - Code: inference/multidisease_model.py, scripts/train_multidesease.py,
+    config/multidisease/config.json, models/multidisease/. Chi tiet day du
+    + ket qua training + endpoint API se ghi vao plans/archetechture.txt
+    muc 11 sau khi training xong.
+  - [DOI HUONG, 2026-08-29] Train local bi buffer output (khong thay tien
+    do) + phat hien 1 tien trinh vo tinh chay bang Python he thong (khong
+    GPU) canh tranh CPU voi tien trinh that -- da huy CA HAI. Chuyen sang
+    train tren Google Colab (GPU manh hon, khong lo tranh chap tai nguyen
+    voi may local). Code cho Colab (7 cell: mount Drive doc kaggle.json,
+    tai dataset qua Kaggle API, tien xu ly khop dung inference/
+    preprocessing.py, model khop dung inference/multidisease_model.py, vong
+    lap train, luu + tai checkpoint ve) da ghi vao plans/ggcolab.txt. Da
+    XOA VINH VIEN data/odir5k_raw/ (~2GB) khoi may local de giai phong dia,
+    vi tu day du lieu train nam tren Colab/Kaggle, khong can giu ban local
+    nua -- chi can copy checkpoint model_best.pth + config.json ve lai sau
+    khi train xong tren Colab (xem huong dan cuoi plans/ggcolab.txt).
+Phase 3 (chuyen sau tung benh neu can do chinh xac cao hon multi-label):
+  - Glaucoma chuyen biet (muc 2.2), roi AMD (muc 2.3) neu xin duoc du lieu
+    AREDS hoac dung HYAMD.
+  - [TRA CUU THEM, 2026-08-29] Kiem tra nhanh (giong cach lam Phase 1/2)
+    xem co pretrained glaucoma dang tin cay khong: KHONG tim duoc github/
+    huggingface nao co san weight tai duoc cho glaucoma tren ORIGA/ACRIMA/
+    REFUGE -- da doc nhieu paper (Nature Eye 2024, npj Digital Medicine
+    2023, PMC10293617...) nhung TAT CA deu chi mo ta "fine-tune tu ImageNet
+    pretrained" (ResNet50/DenseNet-201/EfficientNet-B0/ViT/Swin) MA KHONG
+    cong bo file checkpoint cong khai. => Giong tinh huong Phase 2: neu lam
+    Phase 3, gan chac se PHAI TU TRAIN, khong co shortcut nhu QuickQual.
+    Can chuan bi truoc: tai 1 trong cac dataset (ORIGA/ACRIMA/REFUGE qua
+    IEEE DataPort hoac grand-challenge.org -- LUU Y: khac Kaggle, REFUGE co
+    the can dang ky rieng qua grand-challenge.org, chua xac nhan co ho tro
+    tai tu dong qua API nhu Kaggle hay khong) truoc khi bat tay train.
+  - AMD: dataset chinh (AREDS, 59.302 anh) VAN con khoa qua dbGaP (chua
+    kiem tra lai trong phien nay, gia dinh van dung nhu nghien cuu ban dau
+    o muc 2.3) -- neu khong xin duoc, HYAMD (PhysioNet) la phuong an mo,
+    nhung PhysioNet cung thuong yeu cau tao tai khoan + ky cam ket su dung
+    du lieu (data use agreement) truoc khi tai, khac voi Kaggle API don
+    gian da dung cho ODIR-5K.
+Phase 4 (nang luc moi, lau dai):
+  - Segmentation (vessel/CDR, muc 2.6) va/hoac chuyen sang foundation model
+    dung chung (muc 2.7) khi so luong task/model rieng le bat dau qua tai
+    VRAM.
+
+Cataract that su (qua slit-lamp, muc 2.4) chi nen lam khi san sang dau tu
+mot luong capture/UI moi -- khong xep chung uu tien voi cac task dung chung
+anh fundus o tren.

@@ -1,0 +1,13 @@
+import { chromium } from "playwright";
+const [out1, out2] = [process.argv[2], process.argv[3]];
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+page.on("console", (msg) => { if (msg.type() === "error") console.log("[console.error]", msg.text()); });
+page.on("pageerror", (err) => console.log("[pageerror]", err.message));
+await page.goto("http://localhost:3000/", { waitUntil: "networkidle" });
+await page.evaluate(() => document.getElementById("thang-cham-diem").scrollIntoView());
+await page.waitForTimeout(1000);
+await page.screenshot({ path: out1 });
+await page.waitForTimeout(3200);
+await page.screenshot({ path: out2 });
+await browser.close();

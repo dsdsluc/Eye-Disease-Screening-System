@@ -1,0 +1,31 @@
+# torch/torchvision are installed separately with a CUDA-specific index (see
+# plans/archetechture.txt section 6) -- this repo currently uses cu128 wheels
+# for Blackwell (sm_120) GPU support:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+timm
+opencv-python
+numpy
+Pillow
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Quality gatekeeper (inference/quality_engine.py, plans/archetechture.txt
+# section 10) -- loads the QuickQual sklearn classifier pickle.
+scikit-learn==1.7.2
+joblib
+
+# Glaucoma screen's optic-disc auto-crop (inference/glaucoma_engine.py,
+# plans/plan_glaucoma.txt section 2.1 "Huong A") -- pretrained fovea/optic
+# disc localization model, MIT licensed, weights auto-downloaded from Zenodo
+# on first use and cached locally.
+fundus-image-toolbox==0.1.3
+
+# Modality gatekeeper (inference/modality_gate.py, plans/archetechture.txt
+# "Van de B") -- CLIP zero-shot classification to reject photos of the wrong
+# type (e.g. a selfie sent to a fundus-only endpoint) before they ever reach
+# a disease model. No training/fine-tuning: just cosine similarity between
+# the image embedding and a handful of text-prompt embeddings.
+open_clip_torch
+ftfy
+regex

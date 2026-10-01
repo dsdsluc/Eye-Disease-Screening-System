@@ -1,0 +1,17 @@
+{
+    "model_name": "DR Ensemble",
+    "version": "1.0.0",
+    "task": "Diabetic Retinopathy Grading",
+    "framework": "PyTorch",
+    "image_size": 224,
+    "num_classes": 5,
+    "num_backbones": 4,
+    "num_folds": 5,
+    "backbones": [
+        "inception_v4",
+        "inception_resnet_v2",
+        "seresnext50_32x4d",
+        "seresnext101_32x4d"
+    ],
+    "ensemble": "ensemble"
+}

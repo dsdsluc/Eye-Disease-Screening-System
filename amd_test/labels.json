@@ -1,0 +1,52 @@
+[
+  {
+    "filename": "01_amd.jpg",
+    "true_label": "amd",
+    "likely_odir_source": false
+  },
+  {
+    "filename": "02_normal.jpeg",
+    "true_label": "normal",
+    "likely_odir_source": true
+  },
+  {
+    "filename": "03_amd.jpg",
+    "true_label": "amd",
+    "likely_odir_source": true
+  },
+  {
+    "filename": "04_amd.jpg",
+    "true_label": "amd",
+    "likely_odir_source": true
+  },
+  {
+    "filename": "05_amd.jpg",
+    "true_label": "amd",
+    "likely_odir_source": true
+  },
+  {
+    "filename": "06_amd.jpg",
+    "true_label": "amd",
+    "likely_odir_source": true
+  },
+  {
+    "filename": "07_normal.jpeg",
+    "true_label": "normal",
+    "likely_odir_source": true
+  },
+  {
+    "filename": "08_normal.jpg",
+    "true_label": "normal",
+    "likely_odir_source": true
+  },
+  {
+    "filename": "09_normal.jpg",
+    "true_label": "normal",
+    "likely_odir_source": true
+  },
+  {
+    "filename": "10_normal.jpg",
+    "true_label": "normal",
+    "likely_odir_source": true
+  }
+]

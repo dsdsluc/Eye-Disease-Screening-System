@@ -1,0 +1,457 @@
+FUNDAS_SYSTEM -- CATARACT (DUC THUY TINH THE): KE HOACH CHUYEN BIET
+(luong rieng, KHONG dung anh fundus) -- nghien cuu 2026-09-02
+====================================================
+Ghi lai nghien cuu day du cho Cataract, dung tinh than "professional" nguoi
+dung yeu cau: khong chi tim dataset/pretrained nhu cac benh truoc, ma con
+xac dinh lai TOAN BO kien truc luong (capture/tien xu ly/model) vi day la
+LUONG DAU TIEN trong he thong KHONG dung anh fundus -- da duoc canh bao tu
+plans/plan.txt muc 2.4 tu dau du an ("CANH BAO MODALITY KHAC").
+
+
+1. BOI CANH & CO HOI CHIEN LUOC (khac han moi tinh nang truoc)
+----------------------------------------------------------
+Tat ca tinh nang hien co (DR, quality, multidisease, glaucoma, AMD) deu doi
+hoi ANH FUNDUS -- tuc la CAN MAY CHUP DAY MAT CHUYEN DUNG (fundus camera),
+thu nguoi dung thong thuong KHONG co san o nha. Day la rao can tiep can lon
+nhat cua toan he thong: nguoi dung phai o phong kham/co thiet bi moi dung
+duoc.
+
+Cataract KHAC HAN VE BAN CHAT Y KHOA: duc thuy tinh the nam O PHIA TRUOC
+vong mac (thuy tinh the la 1 "thau kinh" tu nhien phia truoc), nen chi can
+CHUP TU NGOAI VAO (anh ban tien/anterior segment) la thay duoc do duc --
+KHONG can chup xuyen qua dong tu vao day mat nhu fundus. Nghien cuu 2025-
+2026 (xem muc 3) xac nhan xu huong "smartphone-based cataract screening"
+la huong nghien cuu that, dang phat trien (vd he thong Scout(TM) dung
+smartphone + den chieu khuech tan). VE MAT LY THUYET, nguoi dung co the tu
+chup bang camera dien thoai thuong (macro/zoom gan), KHONG can thiet bi y
+te chuyen dung.
+
+=> CO HOI: neu lam dung, Cataract co the la TINH NANG DAU TIEN trong toan
+   he thong ma nguoi dung binh thuong dung duoc NGAY TAI NHA, khong can
+   phong kham/may fundus -- khac han dinh vi "cong cu ho tro phong kham"
+   cua DR/glaucoma/AMD hien tai. Day la ly do nen dau tu ky (dung tinh
+   than "professional" nguoi dung yeu cau), khong chi la "them 1 benh nua".
+
+
+2. RANG BUOC KY THUAT: DAY LA 1 LUONG HOAN TOAN MOI, KHONG TAI SU DUNG DUOC
+   PIPELINE CU
+----------------------------------------------------------
+2.1 KHONG dung duoc inference/preprocessing.py::load_and_crop
+    Ham nay thiet ke de crop VIEN DEN quanh 1 anh fundus HINH TRON (gia
+    dinh nen den, chu the la hinh tron sang giua anh). Anh chup mat tu
+    ngoai vao la ANH CHU NHAT/VUONG BINH THUONG (mat, mi mat, long may, da
+    mat xung quanh), KHONG CO vien den, "crop theo nen den" se KHONG hoat
+    dong hoac cho ket qua sai. Can 1 ham tien xu ly HOAN TOAN MOI.
+
+2.2 Can (hoac nen) co buoc PHAT HIEN + CROP VUNG MAT truoc khi dua vao
+    model. Ly do: anh nguoi dung tu chup (selfie/nguoi khac chup ho) se co
+    ty le khung hinh rat khac nhau (co the thay ca mat, hoac zoom rat sat
+    chi thay long den+dong tu) -- neu khong chuan hoa vung quan tam (ROI)
+    truoc, model se phai hoc tren nen du lieu qua da dang ve bo cuc, giam
+    hieu qua. Tuy chon ky thuat:
+      (a) Dung 1 model phat hien mat/mat nguoi co san (vd mediapipe face
+          mesh + landmark mat, hoac cac model phat hien mat "iris landmark"
+          nhe) de tu dong crop vung mat truoc khi resize -- giong tinh
+          than "auto-crop dia thi giac" da lam cho glaucoma (fundus_image_
+          toolbox), nhung lan nay la "auto-crop vung mat" tu anh ngoai.
+      (b) Don gian hoa: KHONG tu dong crop, ma HUONG DAN NGUOI DUNG tu chup
+          dung khung (giong "canh giua khung hinh" da lam cho fundus, nhung
+          doi copy huong dan cho phu hop: "chup can canh 1 mat, chiem phan
+          lon khung hinh"), chap nhan he thong nhay cam hon voi cach chup.
+    De xuat: bat dau voi (b) (don gian, nhanh trien khai) truoc, cho (a)
+    la nang cap sau neu ty le anh "chup sai bo cuc" cao trong thuc te.
+
+2.3 Model kien truc: van co the tai su dung MAU nhi phan (1 backbone timm +
+    sigmoid) da dung cho glaucoma/AMD -- kien truc phan loai KHONG doi,
+    chi PHAN TIEN XU LY la moi hoan toan.
+
+
+3. BOI CANH Y KHOA + NGHIEN CUU HIEN TAI (2026-09-02)
+----------------------------------------------------------
+    - Tieu chuan vang lam sang: kham bang den khe (slit-lamp), phan do theo
+      LOCS III (Lens Opacities Classification System III).
+    - Nghien cuu hoc thuat co du lieu rieng (KHONG cong khai, xem muc 4.3):
+      "Deep Learning-Based Cataract Detection and Grading from Slit-Lamp
+      and Retro-Illumination Photographs" (Ophthalmology Science, 2022) --
+      1.335 anh slit-lamp + 637 anh retro-illumination, 596 benh nhan,
+      cham LOCS III boi 2 chuyen gia, ensemble ResNet18/WideResNet50-2/
+      ResNeXt50 (day la nguon plans/plan.txt muc 2.4 da tham chieu tu dau).
+    - Xu huong 2025-2026: nhieu nghien cuu moi ve "smartphone-based
+      cataract screening" dung anh ban tien (anterior segment) chup boi
+      smartphone/he thong chieu sang gia re (vd Scout(TM): 6.794 anh tu
+      2.956 benh nhan, 3 benh vien An Do) -- xac nhan huong "chup tu ngoai
+      bang thiet bi pho thong" la huong nghien cuu that dang duoc dau tu,
+      khong phai y tuong ca nhan tu nghi ra.
+    - SLID (slit-lamp image dataset, cong bo thang 1/2026) -- dataset moi
+      cho phan doan/phat hien nhieu ton thuong tren anh slit-lamp, CHUA
+      kiem tra duoc kha nang truy cap cong khai trong lan nghien cuu nay
+      (can kiem tra rieng neu muon theo huong slit-lamp chuyen sau).
+
+
+4. DATASET DA KHAO SAT (tai anh mau xem bang mat, khong tin mo ta suong --
+   dung phuong phap da ap dung xuyen suot du an)
+----------------------------------------------------------
+4.1 "Eye disease Classification Fundus image dataset" (mahin661) -- DA
+    KIEM TRA TU TRUOC (khi lam multidisease validation)
+    Co lop Cataract la ANH BAN TIEN THAT (dung modality can), NHUNG 3 lop
+    con lai (normal/glaucoma/diabetic_retinopathy) cua CHINH bo nay la anh
+    FUNDUS -- tuc la bo nay KHONG CO "normal" cung modality voi Cataract de
+    ghep thanh cap nhi phan. KHONG dung duoc truc tiep cho bai toan nay.
+
+4.2 "eye_diseases_classification" (gunavenkatdoddi, ODbL-1.0, 155K views/
+    37K downloads -- rat pho bien) VA cac ban sao/phai sinh (vd orvile/
+    eye-diseases-classification phien ban 4-lop giong mahin661)
+    KIEM TRA: ten file dang "0_left.jpg", "1062_right.jpg"... GIONG HET
+    quy uoc ODIR-5K, mo ta ghi nguon "IDRiD, Ocular recognition [ODIR],
+    HRF" -- day la BO CATARACT-QUA-FUNDUS (suy tu dau hieu mo/duc trong
+    anh day mat), KHONG PHAI anh ban tien. SAI MODALITY cho bai toan nay,
+    LOAI KHOI can nhac (nhung ghi lai vi de nham voi ten dataset o muc 4.1
+    -- ten dataset gan giong nhau, ke qua noi dung khac han).
+
+4.3 Dataset hoc thuat LOCS III (slit-lamp + retro-illumination, muc 3) --
+    KIEM TRA truy cap: khong tim thay link tai cong khai/data availability
+    statement trong lan tra cuu nay (trang bai bao tra ve 403 khi fetch) --
+    day nhieu kha nang la DU LIEU RIENG cua nghien cuu (596 benh nhan, can
+    dong y dao duc/IRB), GIONG tinh trang AREDS/ADAM. KHONG kha thi de lay
+    trong pham vi du an ca nhan nay.
+
+4.4 "Image Dataset on Eye Diseases Classification (Uveitis, Conjunctivitis,
+    Cataract, Eyelid)" (Kaggle: orvile/eye-diseases-classification -- CHU
+    Y: TRUNG TEN voi muc 4.2 nhung LA 2 dataset KHAC NHAU, de nham) --
+    nguon Mendeley (Bitto & Ahmed, 2024, doi 10.17632/n9zp473wfw.1,
+    Daffodil International University -- CUNG truong da lam AMDNet23).
+    License Kaggle ghi CC BY 4.0.
+    CO DU 2 LOP CAN: Cataract (544 anh) va Normal (649 anh), CA HAI DEU LA
+    ANH BAN TIEN THAT (da tai va xem bang mat: Cataract la anh can mat ro
+    dong tu duc/xam; Normal la anh mat khoe, dong tu trong suot -- DUNG
+    MODALITY, day la nguon DAU TIEN tim duoc co du cap nhi phan cung
+    modality).
+
+    PHAT HIEN RUI RO NGHIEM TRONG (quan trong nhat cua toan bo nghien cuu
+    nay, phat hien khi do kich thuoc anh THAT, khong chi xem bang mat):
+      Do do phan giai 30 anh dau moi lop:
+        Cataract: rong trung binh ~248px (dao dong 153-427px)
+        Normal:   rong trung binh ~54px  (dao dong 45-69px)
+      => LECH DEN 4-5 LAN VE DO PHAN GIAI GIUA 2 LOP, MOT CACH CO HE
+      THONG (khong phai vai anh le te). Day la BAY "hoc tat" (shortcut
+      learning) KINH DIEN: model se de dang phan biet 2 lop bang DO NET/
+      DO CHI TIET con lai sau khi resize ve 224x224 (anh Normal 45-69px
+      phong to len se mo/rang), THAY VI hoc dau hieu duc thuy tinh the
+      that -- GIONG (nhung RO RANG HON NHIEU) so voi nghi van da neu cho
+      model AMD (plans/plan_AMD.txt muc 7).
+      NGUYEN NHAN CO THE: mo ta ghi ro "images collected from online
+      sources (via Google search) using disease-specific keywords" --
+      tim "cataract eye" tren Google co the ra nhieu anh minh hoa
+      y khoa/bao chi (kich thuoc lon), con tim "normal eye" co the ra
+      nhieu anh icon/thumbnail/stock-photo nho hon nhieu -- KHONG CO quy
+      trinh thu thap chuan hoa nao dam bao 2 lop cung phan phoi kich
+      thuoc.
+
+    RUI RO BAN QUYEN THEM: anh "thu thap tu Google search", tac gia dataset
+    KHONG PHAI nguoi chup/so huu anh goc -- nhan "CC BY 4.0" ho tu gan cho
+    BAN COMPILE cua ho, KHONG co nghia TUNG ANH RIENG LE trong do that su
+    duoc phep tai su dung tu do (co the dinh anh bao chi/stock photo co
+    ban quyen rieng). Nguoi dung da xac nhan truoc day "du an ca nhan,
+    khong kinh doanh" nen chap nhan duoc muc rui ro nay TUONG TU cac
+    truong hop truoc (QuickQual, ODIR mirror...), NHUNG day la truong hop
+    RUI RO CAO NHAT tung gap ve nguon goc anh (it nhat cac dataset truoc
+    con la anh y te tu benh vien/nghien cuu, day la anh "Google search"
+    khong ro nguon tung anh).
+
+4.5 KET LUAN DATASET: CO 1 nguon kha thi (muc 4.4) nhung PHAI XU LY rui ro
+    do phan giai TRUOC KHI train (xem de xuat muc 6), khong the dung
+    nguyen nhu tai ve. Day la lan DAU TIEN trong du an phat hien 1 dataset
+    co loi HE THONG RO RANG den vay qua do luong dinh luong (khong chi
+    xem bang mat) -- minh chung ro cho viec luon phai kiem tra thuc te
+    thay vi tin mo ta, dung tinh than da ap dung xuyen suot.
+
+
+5. PRETRAINED MODEL -- KHONG TIM DUOC MODEL CHUYEN DUNG SAN CO
+----------------------------------------------------------
+Tra cuu GitHub/HuggingFace: chi tim duoc cac repo ca nhan (vd Prajwal
+10031999/Cataract-Detection-using-VGG-19, ddhuri1/Cataract-Detection) DEU
+la fine-tune tu ImageNet-pretrained (VGG19...) tren dataset nho tu-thu-
+thap, KHONG phai model chuyen dung cong bo chinh thuc (khac DeepSeeNet cua
+AMD). "CataractSAM-2" co pretrained that nhung cho bai toan KHAC HAN
+(phan doan hinh anh PHAU THUAT duc thuy tinh the -- video mo, khong phai
+sang loc tu 1 anh chup thuong).
+=> GIONG tinh huong glaucoma/multidisease (KHONG co pretrained), KHAC AMD
+   (co DeepSeeNet). Neu lam, PHAI TU TRAIN.
+
+
+6. DE XUAT KY THUAT CU THE (chua trien khai, can nguoi dung duyet truoc)
+----------------------------------------------------------
+6.1 Xu ly rui ro do phan giai (muc 4.4) TRUOC KHI train -- 2 lua chon:
+    (a) Loc theo nguong: chi giu anh co canh ngan nhat >= X pixel (vd 100px)
+        O CA HAI LOP -- neu lop Normal con lai qua it anh sau loc (nhieu
+        kha nang, vi phan lon Normal la anh <70px), lop nay co the KHONG
+        DU DU LIEU de train rieng tu bo nay.
+    (b) Chu dong lam MO anh o lop co do phan giai cao hon (Cataract) xuong
+        cung muc voi lop thap hon truoc khi dua vao pipeline train, ep ca
+        2 lop ve CUNG 1 "tran" chi tiet toi da -- giu duoc so luong anh
+        nhung mat bot chi tiet that.
+    (c) TOT NHAT (neu du thoi gian): tim/bo sung THEM anh Normal chat
+        luong cao hon tu nguon khac (vd tu chup, hoac 1 dataset "external
+        eye normal" rieng chua tim trong lan nghien cuu nay) de thay the
+        hoac bo sung lop Normal, thay vi chi xu ly anh cu.
+    KHUYEN NGHI: lam (a) truoc de danh gia thuc te con lai bao nhieu anh,
+    roi quyet dinh co can (c) hay khong.
+
+6.2 Tien xu ly rieng (module moi, KHONG dung load_and_crop):
+    - inference/cataract_preprocessing.py (ten de xuat): resize truc tiep
+      (khong crop-theo-nen-den), co the them buoc chuan hoa anh sang/mau
+      don gian (vd CLAHE nhe, tuong tu da lam cho AMD) NEU sau khi xem anh
+      mau thay can thiet -- CHUA quyet dinh, can xem lai sau khi loc du
+      lieu o muc 6.1.
+    - Neu di huong "auto-crop vung mat" (muc 2.2.a): can them 1 thu vien
+      phat hien mat (vd mediapipe) -- day se la dependency MOI, giong cach
+      fundus_image_toolbox da them cho glaucoma.
+
+6.3 Model + huan luyen: tai su dung NGUYEN mau nhi phan (1 backbone timm +
+    sigmoid, BCEWithLogitsLoss) da chung minh hoat dong voi glaucoma/AMD --
+    khong can thiet ke lai kien truc, chi doi tien xu ly dau vao.
+
+6.4 UI/capture rieng (KHI den luot lam web/, chua phai bay gio): huong dan
+    chup can canh 1 mat, du sang, khong loa flash truc tiep vao mat -- khac
+    han huong dan "canh giua vong mac vao khung hinh" dang dung cho fundus.
+    Day LA tinh nang dau tien co the mo cho ca nguoi dung khong co may
+    fundus (muc 1), nen trang gioi thieu tinh nang nay co the nhan manh
+    diem nay ("chi can dien thoai, khong can may chup chuyen dung").
+
+
+7. UOC TINH THOI GIAN (cung dinh dang da dung cho AMD, de so sanh)
+----------------------------------------------------------
+    (1) Tai + loc du lieu theo muc 6.1(a), danh gia so luong con lai      ~1-2 gio
+    (2) Neu can bo sung nguon Normal moi (6.1c)                          ~1-3 gio (khong chac tim duoc)
+    (3) Viet module tien xu ly moi (khong load_and_crop)                  ~1-2 gio
+    (4) Chinh notebook Colab tu mau glaucoma/AMD (doi phan tai data +
+        tien xu ly, giu nguyen kien truc)                                 ~1-2 gio
+    (5) Train tren Colab GPU                                       ~5-15 phut chay, +1-2 gio neu can thu lai
+    (6) Kiem tra ket qua that ky (rut kinh nghiem AMD: DOC KY log tung
+        epoch, khong chi nhin val_f1 cuoi cung) -- vi dataset nay co rui ro
+        shortcut RO HON CA AMD, kha nang cao se lai thay dau hieu overfit/
+        hoc tat, can danh gia trung thuc truoc khi quyet dinh co dung
+        khong                                                             ~1 gio
+    (7) Tich hop inference (model.py/engine.py/config/endpoint theo mau)  ~1-2 gio
+    TONG UOC TINH: ~6-12 gio (tuong duong Huong B cua AMD, CONG THEM thoi
+    gian xu ly du lieu vi phat hien loi do phan giai can khac phuc truoc).
+
+
+8. CAU HOI MO CAN NGUOI DUNG QUYET DINH
+----------------------------------------------------------
+    - Chap nhan rui ro ban quyen "anh Google search" (muc 4.4, cao hon moi
+      dataset da dung truoc do) cho du an ca nhan nay khong?
+      [DA CHOT, 2026-09-02] Nguoi dung chap nhan rui ro nay.
+    - Di huong 6.1(a) loc bot du lieu truoc, hay dau tu them 6.1(c) tim
+      nguon Normal chat luong cao hon (ton them thoi gian, chua chac co
+      ket qua)?
+      [CHUA CHOT] Nguoi dung chua quyet -- nhung yeu cau uu tien SO 1 la
+      "co duoc 1 model" truoc, va moi rui ro hoc-tat-qua-do-phan-giai phai
+      duoc XU LY NGAY TRONG CAC CELL COLAB (khong phai bang cach loc/tim
+      them du lieu truoc khi train) -- xem muc 9 cho ky thuat cu the.
+    - Muc 2.2: bat dau voi (b) huong dan chup dung khung (don gian) hay
+      dau tu (a) auto-crop vung mat tu dau (phuc tap hon nhung on dinh
+      hon ve lau dai)?
+      [DA CHOT, 2026-09-02] Nguoi dung chon (a) -- auto-crop vung mat.
+      Xem muc 9.4 cho ghi chu quan trong: day la buoc INFERENCE-TIME
+      (inference/cataract_engine.py sau nay), KHONG can trong notebook
+      train, vi anh train (muc 4.4) da la anh can canh mat san.
+
+
+9. CAP NHAT (2026-09-02): KY THUAT CU THE XU LY RUI RO SHORTCUT-LEARNING
+   NGAY TRONG NOTEBOOK COLAB (truoc khi tao file .ipynb that)
+----------------------------------------------------------
+Nguyen tac chi dao (nguoi dung, 2026-09-02): UU TIEN SO 1 la co 1 model
+hoan chinh; xu ly rui ro do phan giai (muc 4.4) bang ky thuat TRONG QUA
+TRINH TRAIN (cac cell Colab), KHONG phai bang cach loc bot/tim them du
+lieu truoc (hoan lai cau hoi 6.1(a)/(c) sang sau).
+
+9.1 Ghi lai do phan giai GOC cua tung anh luc xay manifest
+    Khi doc danh sach anh (tuong duong Cell 4 cua glaucoma/AMD), THEM 1
+    truong "native_short_side" (= min(width, height) cua anh GOC, TRUOC
+    resize) vao moi dong. Day la du lieu chan doan can co de lam muc 9.3 --
+    khong the them lai sau khi da resize mat thong tin goc.
+
+9.2 "San bang" do phan giai giua 2 lop TRUOC KHI dua vao model -- ky thuat
+    downsample-roi-upsample (khong phai loc bo anh)
+    Thay vi loai anh nho (mat du lieu) hay chi resize thang len 224 (giu
+    nguyen loi the do net cua lop Cataract), ap dung cho MOI ANH (ca 2
+    lop) 1 buoc "ep tran chi tiet chung":
+      (1) Chon 1 nguong SHORT_SIDE_CAP (vd 80-100px -- CAN thu nghiem +
+          xem anh mau truc quan o muc 9.3 truoc khi chon so cuoi cung,
+          KHONG chon cung 54px cua lop Normal vi qua nho se xoa luon dau
+          hieu duc thuy tinh the that, cung KHONG de nguyen 248px cua lop
+          Cataract vi giu nguyen loi the do net).
+      (2) Voi MOI anh: resize XUONG SHORT_SIDE_CAP truoc (cv2.resize,
+          INTER_AREA), roi resize LEN lai kich thuoc chuan dau vao model
+          (224x224, INTER_LINEAR/CUBIC). Ket qua: ca anh Cataract (von
+          248px) LAN anh Normal (von 54px) DEU bi "tran" o cung 1 muc chi
+          tiet toi da SAU buoc nay -- xoa bo tin hieu "do net con lai" ma
+          model co the loi dung, GIU LAI cac dac trung THO/DIEN RONG nhu
+          vung duc/mo lon o dong tu (day la dac trung LON, khong phai chi
+          tiet nho, nen van song sot qua buoc "ep tran" nay).
+      (3) Ap dung buoc nay cho CA train LAN val (khong chi train) -- neu
+          chi ap dung cho train, val se van con roi tin hieu do phan giai
+          that, lam bao cao val_f1 tiep tuc bi thoi phong nhu da thay o
+          AMD.
+
+9.3 Cell "xem truoc bang mat" SAU KHI ep tran do phan giai (mau da lam cho
+    AMD, ap dung lai o day) -- BAT BUOC, khong tuy chon
+    Sau buoc 9.2, hien 10 anh ngau nhien (ca 2 lop) O DANG DA QUA "ep tran"
+    (khong phai anh goc) truoc khi train that. Nguoi xem tu hoi: "voi do
+    net nhu the nay, TOI (con nguoi) con phan biet duoc dau tu duc/dong
+    tu binh thuong khong?" Neu KHONG con phan biet duoc bang mat -> nguong
+    SHORT_SIDE_CAP dat qua thap, tang len va thu lai. Neu qua de phan biet
+    y het anh goc -> nguong dat qua cao, giam xuong. Day chinh la cach
+    "thu nghiem tim so cuoi cung" da nhac o muc 9.2(1).
+
+9.4 [DA SUA LAI, xem muc 9.8] Kiem chung KHONG dung "breakdown theo do
+    phan giai goc" nhu ban dau du kien -- ly do da phat hien khi thiet ke
+    chi tiet: do phan giai 2 lop KHONG HE GIAO NHAU (Cataract 153-427px,
+    Normal 45-69px, xem muc 4.4), nen "chia nhom theo do phan giai goc"
+    thuc chat se TRUNG KHOP gan nhu hoan toan voi "chia nhom theo nhan
+    that" -- do KHONG PHAI 1 phep kiem chung doc lap, chi lap lai accuracy
+    theo tung lop (da co san). Thay bang ky thuat o muc 9.8.
+
+9.5 (Bo sung, neu 9.2-9.4 van chua du) Augmentation lam nhieu/mo NGAU
+    NHIEN luc train (chi ap dung cho train, KHONG ap dung cho val)
+    Them 1 buoc augmentation ngau nhien (vd torchvision.transforms.
+    GaussianBlur voi sigma ngau nhien trong 1 khoang, hoac gia lap nen
+    JPEG bang cach encode/decode lai anh voi quality ngau nhien thap) VAO
+    THEM, ben canh flip ngang da dung cho glaucoma/AMD -- muc dich la
+    khien model KHONG THE dua vao 1 "muc do net" co dinh nao de doan nhan,
+    buoc phai hoc dac trung hinh dang/vung mo-duc thay vi kiem tra do net
+    tong the cua ca buc anh.
+
+9.6 Loc trung lap bang hash noi dung (bai hoc tu AMD, ap dung lai o day
+    vi day cung la du lieu ghep/thu thap tu nhieu nguon khong kiem soat)
+    Dung lai chinh xac ky thuat da dung trong Fundas_AMD_Training.ipynb
+    Cell 4 (MD5 hash tung file, giu 1 ban dai dien moi hash) truoc khi
+    split train/val.
+
+9.7 CAP NHAT SAU KHI TRA CUU THEM (2026-09-02): CHON NGUONG SHORT_SIDE_CAP
+    BANG CONG THUC, KHONG DOAN SO
+    Da tra cuu them ve "shortcut learning tu confound (do phan giai/thiet
+    bi chup) trong hoc sau y te" (Zech et al., cac bai tong quan "Shortcuts
+    Causing Bias in Radiology AI") -- xac nhan huong "data-centric
+    preprocessing / lam khop chat luong giua cac nhom" (muc 9.2) DUNG
+    huong voi cac ky thuat da duoc cong bo (khong co 1 "cong thuc chuan"
+    duy nhat duoc dat ten rieng cho truong hop nay, nhung day la ung dung
+    hop ly cua nhom ky thuat "disparate impact removal" / "quality
+    matching" da duoc nhac trong cac bai tong quan). CAC ky thuat hoc
+    thuat manh hon (distillation tu teacher khong-thien-vi, toi uu LRP
+    heatmap, phan tach representation qua mutual information) DEU can ha
+    tang huan luyen phuc tap hon nhieu (them model phu, vong lap toi uu
+    rieng) -- KHONG phu hop voi 1 notebook Colab don gian, quyet dinh
+    KHONG dung, giu huong don gian nhu muc 9.2 nhung LAM CHAT LUONG HON:
+
+    THAY vi chon SHORT_SIDE_CAP co dinh (80-100px doan truoc), TINH TOAN
+    NGUONG NAY TU CHINH DU LIEU THAT trong notebook:
+      (1) Sau khi doc xong native_short_side ca 2 lop (muc 9.1), xac dinh
+          lop nao co do phan giai THAP HON theo trung vi (median).
+      (2) SHORT_SIDE_CAP = phan vi 90 (90th percentile) cua native_short_
+          side trong CHINH lop thap hon do (dung percentile, KHONG dung
+          max tuyet doi, de 1 anh ngoai lai bat thuong khong ep nguong
+          xuong qua thap).
+      (3) Ap dung ep tran (downsample-neu-native-lon-hon-CAP, roi upsample
+          ve 224) cho MOI anh CA HAI LOP nhu muc 9.2.
+    Ly do lam vay: nguong tinh THEO DU LIEU THAT (khong phai so doan truoc
+    tu 30 anh mau da xem luc nghien cuu) dam bao gan nhu TOAN BO lop do-
+    phan-giai-thap di qua buoc nay MA KHONG BI DOI (vi da o duoi/gan
+    nguong cua chinh no), trong khi TOAN BO lop do-phan-giai-cao BI EP
+    XUONG dung nguong do -- XOA SACH khoang cach do phan giai giua 2 lop
+    THEO CONG THUC, khong con la so doan/thu-sai thu cong.
+
+9.8 Kiem chung dinh luong THAY THE cho muc 9.4 (da bo, xem ghi chu o do):
+    DO DO SAC NET (Laplacian variance) TUNG LOP, TRUOC VA SAU khi ep tran
+    Vi 2 lop khong giao nhau ve do phan giai (muc 9.4), khong the dung
+    "chia nhom theo do phan giai" de kiem chung doc lap -- THAY BANG do 1
+    dai luong khac: phuong sai Laplacian (cv2.Laplacian(...).var(), thuoc
+    do do net/chi tiet pho bien trong xu ly anh) tinh TRUNG BINH cho moi
+    lop, O CA 2 THOI DIEM:
+      (a) TRUOC ep tran (tren anh goc) -- ky vong THAY RO chenh lech lon
+          giua 2 lop (xac nhan lai bang so, khong chi bang mat, dung con
+          so do da tinh o muc 4.4).
+      (b) SAU ep tran (tren anh da qua downsample-upsample) -- ky vong 2
+          lop co phuong sai Laplacian GAN NHAU (chenh lech nho) -- day la
+          BANG CHUNG DINH LUONG (khong chi truc quan o muc 9.3) cho thay
+          "tin hieu do net" khong con phan biet duoc 2 lop nua SAU buoc
+          xu ly, khac han truoc do.
+    In ca 2 cap so nay ra ngay ke sau buoc tinh SHORT_SIDE_CAP (muc 9.7)
+    va lai lan nua sau buoc xem anh mau (muc 9.3), truoc khi vao Cell train
+    that -- day la "cong tac an toan" cuoi cung truoc khi cam ket train.
+
+
+TOM TAT THU TU CELL du kien khi tao .ipynb (CHUA tao, cho quyet dinh cuoi
+cua nguoi dung):
+  Cell 1-2: Mount Drive + tai dataset (giong mau cu)
+  Cell 3: Tien xu ly co ban + ham "ep tran do phan giai" (muc 9.2)
+  Cell 4: Xay manifest -- hash-dedup (9.6) + ghi native_short_side (9.1)
+  Cell 5: Split train/val
+  Cell 6: XEM TRUOC anh sau khi ep tran (9.3) -- BAT BUOC dung lai kiem
+          tra bang mat truoc khi sang Cell 7
+  Cell 7: Model (nhi phan, giong mau glaucoma/AMD)
+  Cell 8: Train + augmentation mo/nhieu (9.5) + breakdown theo do phan
+          giai goc (9.4)
+  Cell 9: Luu checkpoint + tai ve
+  Cell 10: Xuat anh test mau + labels.json (giong mau cu)
+
+
+10. KET QUA CHAY THAT LAN 1 (v1, 2026-09-02) -- PHAT HIEN GIA DINH SAI CHIEU,
+    DA SUA THANH v2
+----------------------------------------------------------
+Nguoi dung chay Fundas_Cataract_Training.ipynb (v1, dung "ep tran do phan
+giai PIXEL" nhu muc 9.2/9.7) tren Colab. KET QUA THAT (doc tu file .ipynb
+da tai ve, xem output Cell 4/6/8):
+
+    Cell 4 (TRUOC xu ly, do THAT):
+      Cataract: 543 anh (543 unique sau dedup), do phan giai trung vi 187px
+      Normal:   649 anh (649 unique sau dedup), do phan giai trung vi 56px
+      Sharpness (Laplacian variance): cataract=227.2  normal=1011.6
+
+    => GIA DINH BAN DAU (muc 9.2, "anh pixel to se sac net hon") SAI CHIEU:
+       Normal (pixel NHO hon) lai co Laplacian variance CAO HON Cataract
+       (pixel TO hon) toi 4.5 LAN. Nhieu kha nang do anh thumbnail nho bi
+       nen/sharpen qua tay luc tao (pho bien voi anh web nho) -- "nhieu
+       canh" nhieu hon du it chi tiet that, KHONG lien quan gi den do net
+       thuc su hay dau hieu duc thuy tinh the.
+
+    Cell 6 (SAU khi ep tran theo pixel cua v1):
+      Sharpness: cataract=36.7 (bi lam mo, vi pixel > cap)
+                 normal=865.8 (gan nhu khong doi, vi pixel <= cap)
+      => Ty le chenh lech NOI RONG tu 4.5 lan len 23.6 LAN -- ham "ep tran
+         theo pixel" da lam mo NHAM lop (lam mo Cataract la lop VON DA it
+         sac net hon, de nguyen Normal la lop VON DA sac net hon).
+
+    Cell 8 (train that): val_f1 = 1.000 NGAY EPOCH 1, giu nguyen 22/25
+    epoch -- xac nhan day la hoc-tat qua chi so sac net (do chinh ham xu ly
+    cua v1 gay ra), khong phai model hoc duoc dau hieu duc thuy tinh the
+    that.
+
+    NGUYEN NHAN GOC: dung DO PHAN GIAI PIXEL lam proxy cho "do sac net" la
+    SAI GIA DINH cho dataset nay -- 2 dai luong nay KHONG ti le thuan nhu
+    ky vong (co the dung voi anh cung 1 nguon chup dong nhat, nhung SAI voi
+    anh ghep tu nhieu nguon Google search khac nhau, moi nguon co quy trinh
+    nen/resize/sharpen khac nhau).
+
+11. DA SUA THANH v2 (2026-09-02) -- CAN BANG THEO SHARPNESS THAT, KHONG
+    CON DUNG PIXEL LAM PROXY
+----------------------------------------------------------
+Fundas_Cataract_Training.ipynb da duoc VIET LAI (v2, GHI DE len file cu):
+  - BO HOAN TOAN ham "ep tran theo do phan giai pixel" (degrade_to_cap).
+  - THAY BANG: do Laplacian variance THAT cho 2 lop (Cell 4, giu nguyen
+    buoc nay tu v1 -- day la buoc da phat hien ra van de) -> XAC DINH LOP
+    SAC NET HON THEO SO DO THAT (khong gia dinh truoc, co the la Cataract
+    HOAC Normal tuy dataset) -> HIEU CHINH 1 muc lam mo Gaussian (BLUR_
+    SIGMA) bang thu-dan tren mau cua lop sac net hon, tang dan sigma cho
+    toi khi sharpness trung binh giam ve gan bang lop kia -> AP DUNG dung
+    sigma nay cho MOI anh cua lop sac net hon (khong dieu kien tung anh).
+  - Cell 6: in lai ty le chenh lech sharpness TRUOC/SAU (dang "Nx"), yeu
+    cau nguoi dung DUNG LAI neu ty le AFTER van > ~2x, khong duoc train
+    tiep khi chua ro.
+  - Cell 8: them canh bao ro rang "neu val_f1=1.000 tu epoch 1, DUNG VOI
+    TIN, quay lai doc so lieu sharpness".
+  - config.json output (Cell 9) ghi lai NGUYEN VAN bai hoc v1 vao truong
+    "known_caveats" (khong xoa lich su loi, giong cach da lam voi AMD).
+
+CHUA CHAY LAI v2 tren Colab -- cho nguoi dung chay va bao ket qua.

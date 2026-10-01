@@ -1,0 +1,8 @@
+{
+    "backbone": "seresnext101_32x4d",
+    "num_folds": 5,
+    "image_size": 224,
+    "dropout": 0.5,
+    "pretrained": true,
+    "checkpoint_format": "pth"
+}

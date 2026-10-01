@@ -1,0 +1,10 @@
+{
+    "task": "Fundus Image Quality Gatekeeper",
+    "method": "QuickQual (Engelmann & MacGillivray, 2023) -- https://github.com/justinengelmann/QuickQual",
+    "backbone": "densenet121.tv_in1k",
+    "checkpoint": "quickqual_dn121_512.pkl",
+    "checkpoint_source": "https://github.com/justinengelmann/QuickQual/releases/download/1.0/quickqual_dn121_512.pkl",
+    "checkpoint_license": "none published by the author (verified via GitHub API: license=null) -- used here for local/personal, non-commercial use only per explicit user decision (see plans/archetechture.txt section 10). Do NOT redistribute or use commercially without contacting the author.",
+    "labels_note": "label order is fixed by the pickled sklearn classifier (Good, Usable, Bad); see inference/quality_model.QUALITY_LABELS, not configurable here.",
+    "gate_mode": "fail_open"
+}

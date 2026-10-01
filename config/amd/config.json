@@ -1,0 +1,22 @@
+{
+    "task": "AMD Specialist Screening (Phase 3, plans/plan_AMD.txt, Huong B)",
+    "dataset_source": "https://www.kaggle.com/datasets/orvile/macular-degeneration-disease-dataset (AMDNet23, Mendeley doi:10.17632/yj35kjgrv3.1)",
+    "backbone": "seresnext50_32x4d",
+    "image_size": 224,
+    "dropout": 0.3,
+    "labels": ["normal", "amd"],
+    "checkpoint": "model_best.pth",
+    "val_accuracy": 0.9913793103448276,
+    "val_precision": 0.9824561403508771,
+    "val_recall": 1.0,
+    "val_f1": 0.9911504424778761,
+    "best_epoch": 9,
+    "is_experimental": true,
+    "requires_optic_disc_crop": false,
+    "requires_gamma_clahe": true,
+    "gamma": 1.2,
+    "clahe_clip_limit": 2.0,
+    "clahe_tile_grid_size": [8, 8],
+    "trained_on": "2026-09-02, Google Colab (plans/Fundas_AMD_Training.ipynb), checkpoint copied back to models/amd/model_best.pth",
+    "notes": "NOT VALIDATED end-to-end -- unlike glaucoma (plans/plan_glaucoma.txt), no independent held-out dataset was found/used to confirm real-world accuracy (plans/plan_AMD.txt sections 3-4: every easily-accessible AMD dataset either overlaps with ODIR-5K or requires gated access). Training log shows classic overfitting signs (train_loss collapsed to ~0.0001 by epoch ~12, val_recall pinned at 1.0 for 18/25 epochs) on a small (~900 image, 6-source) dataset -- the 99.1% val_f1 above is almost certainly inflated (near-duplicate images across the 6 source datasets are not caught by exact-hash dedup, and the AMD-labeled samples skew toward advanced/textbook-obvious cases) and should NOT be read as real-world accuracy. Deployed anyway per explicit user decision (not a priority feature for this project) -- disclaimer in the UI/response must reflect this is substantially less validated than glaucoma or multidisease, not just 'experimental' in the generic sense. Training images were also pre-processed by the dataset author with gamma correction + CLAHE (exact original parameters unknown) -- inference/amd_engine.py applies its own gamma+CLAHE approximation (see gamma/clahe_* fields above) before classification to reduce train/inference distribution mismatch, but this is a best-effort match, not a verified replication of the original parameters."
+}

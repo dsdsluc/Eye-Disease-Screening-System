@@ -1,0 +1,62 @@
+HUONG DAN: BAT FASTAPI (inference) VA WEB (Next.js)
+====================================================
+
+1. BAT FASTAPI (tang inference, port 8000)
+-------------------------------------------
+Mo terminal, dung dung Python trong .venv (khong dung python he thong):
+
+    cd D:\Fundas_System
+    .venv\Scripts\python.exe scripts\run_server.py
+
+Hoac cach tuong duong (goi truc tiep uvicorn):
+
+    cd D:\Fundas_System
+    .venv\Scripts\python.exe -m uvicorn inference.main:app --host 127.0.0.1 --port 8000
+
+Luu y:
+  - Warmup mat ~60-90 giay (dang load 7 model: DR ensemble, quality
+    gatekeeper, multidisease, glaucoma, AMD, cataract, CLIP modality gate).
+    Trong luc do goi API se khong phan hoi.
+  - Biet server da san sang khi thay dong log:
+        INFO:     Application startup complete.
+        INFO:     Uvicorn running on http://127.0.0.1:8000
+  - Kiem tra nhanh server da len chua:
+        curl http://127.0.0.1:8000/docs
+    (tra ve 200 la da san sang; "connection refused"/khong phan hoi la
+    chua bat hoac da bi tat).
+  - Server nay PHAI duoc bat thu cong moi lan can dung -- KHONG tu dong
+    khoi dong, KHONG tu phuc hoi khi bi crash/tat (xem plans/
+    archetechture.txt audit finding #1 -- da thu giai phap Windows
+    Scheduled Task tu-restart nhung nguoi dung chu dong go bo, quyet dinh
+    van bat thu cong).
+  - Neu terminal/session dong lai, tien trinh uvicorn se bi tat theo --
+    can bat lai tu dau.
+
+
+2. BAT WEB (Next.js, port 3000)
+---------------------------------
+Mo mot terminal KHAC (song song voi FastAPI, khong thay the):
+
+    cd D:\Fundas_System\web
+    npm run dev
+
+Luu y:
+  - Can FastAPI da bat va san sang TRUOC (web goi sang inference qua
+    INFERENCE_URL, mac dinh http://127.0.0.1:8000 -- xem web/src/lib/
+    server/inference-client.ts) -- neu bat web truoc, cac tinh nang
+    upload/phan tich anh se loi cho toi khi FastAPI len.
+  - Next.js (Turbopack) se bao san sang nhanh (~4s):
+        ✓ Ready in 4.0s
+    nhung lan goi API dau tien vao 1 route con` moi (chua compile) co the
+    cham hon vai tram ms (Turbopack compile on-demand).
+  - Truy cap: http://localhost:3000
+  - Kiem tra nhanh: curl http://127.0.0.1:3000
+
+
+3. THU TU KHUYEN NGHI
+------------------------
+  1. Bat FastAPI truoc, doi warmup xong (curl /docs tra 200).
+  2. Bat web sau.
+  3. Dung xong thi tat ca hai terminal (Ctrl+C) hoac taskkill tien trinh
+     python.exe (uvicorn) va node.exe (next dev) -- khong co gi tu dong
+     don dep, ca hai deu phai tat thu cong.

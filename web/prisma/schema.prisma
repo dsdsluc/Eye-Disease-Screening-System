@@ -1,0 +1,319 @@
+// Reset 2026-08-29: all previous models (doctor/workspace/prescription/etc.)
+// removed along with web/src/app/doctor, web/src/app/workspace, web/src/app/api
+// -- rebuilding from home + upload only. See plans/plan_web.txt for the
+// phased plan; this is Phase 1 (account + personal scan history).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  // Nullable now (both were required before): app/doctor/new-case lets a
+  // doctor create a walk-in patient record with no login of their own --
+  // still a real patient (Scan.userId points here the same as anyone
+  // self-registered), just one who never gets a session cookie. Postgres
+  // allows multiple NULLs under a UNIQUE constraint, so this doesn't
+  // relax the "no two real accounts share an email" guarantee for accounts
+  // that DO have one.
+  email        String?  @unique
+  passwordHash String?
+  fullName     String
+  // Kept (not part of the Phase 1 plan) only because login/page.tsx and
+  // lib/account.ts's routeForRole() -- deliberately kept as UI per the
+  // reset -- already reference a role; no doctor accounts/UI exist yet,
+  // this just avoids rewriting that kept code. See plans/plan_web.txt
+  // section 3, Phase 2.
+  role         String   @default("patient")
+  createdAt    DateTime @default(now())
+
+  // Optional demographic/contact fields -- nullable since every existing
+  // account predates them, and register/page.tsx still only collects
+  // email/fullName/password (a longer signup form isn't part of this
+  // change). Filled in later from /account. Age/gender are relevant to DR
+  // risk, not just contact info -- phone is for reaching the patient.
+  phone       String?
+  dateOfBirth DateTime?
+  gender      String?
+
+  // Hospital-intake-form fields for the doctor's patient chart
+  // (app/doctor/patients/[id]) -- all nullable/backfilled, same reasoning
+  // as phone/dateOfBirth/gender above: every existing account predates
+  // these, and there's no self-serve form collecting them yet either.
+  nationalId            String?
+  address               String?
+  occupation            String?
+  bloodType             String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  medicalHistory        String?
+  insuranceNumber       String?
+
+  // Doctor CV fields (app/doctor/profile) -- same convention as the patient
+  // intake fields above: live on User directly rather than reintroducing
+  // the separate DoctorProfile table the pre-reset version had. Only ever
+  // populated for role: "doctor" accounts; nullable for the same reason
+  // every other optional field here is (no existing account has them yet).
+  title             String?
+  specialty         String?
+  licenseNumber     String?
+  hospital          String?
+  yearsOfExperience Int?
+  education         String?
+  bio               String?
+  avatarUrl         String?
+
+  scans                  Scan[]
+  multidiseaseScreenings MultidiseaseScreening[]
+  glaucomaScreenings     GlaucomaScreening[]
+  cataractScreenings     CataractScreening[]
+  amdScreenings          AmdScreening[]
+  doctorReviews          DoctorReview[]
+  screeningReviews       ScreeningReview[]
+  glaucomaReviews        GlaucomaReview[]
+  cataractReviews        CataractReview[]
+}
+
+// Deliberately one table, not Image+Result split like the old schema:
+// a scan is always created whole (grade/score arrive together from
+// inference/), so there was never a reason for two rows per upload.
+model Scan {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  filename       String?
+  cloudUrl       String?
+  grade          Int
+  score          Float
+  backboneScores Json
+  perFoldScores  Json
+  // From inference's /quality-check (see plans/archetechture.txt section 10)
+  // -- captured now (the pre-reset version never persisted this) so a
+  // future ops dashboard has this data from day one instead of waiting.
+  qualityLabel   String?
+  qualityProbs   Json?
+  createdAt      DateTime @default(now())
+
+  // Point-in-time clinical context from app/doctor/new-case's intake form --
+  // on Scan, not User: HbA1c/blood pressure are readings from that visit,
+  // not permanent facts about the patient the way phone/address are.
+  // Null for every scan from the ordinary /upload flow, which never asked
+  // for this.
+  diabetesDurationYears Int?
+  hba1c                 Float?
+  bloodPressure         String?
+  clinicalNote          String?
+
+  multidiseaseScreenings MultidiseaseScreening[]
+  doctorReview           DoctorReview?
+
+  @@index([userId])
+}
+
+// Multi-disease screening (plans/plan_multidisease.txt) -- deliberately a
+// SEPARATE table from Scan, not extra columns on it: this is an opt-in
+// feature the user triggers on demand, not something computed automatically
+// for every upload the way qualityLabel/qualityProbs above are. scanId is
+// optional because a screening can either be run against a photo already
+// on file (re-using a Scan's image) or a fresh upload with no Scan of its
+// own. See plans/plan_multidisease.txt section 4.1 and section 6 for why
+// this must never be presented as equivalent in confidence to Scan.grade
+// (single-label 8-way baseline, ~62% val accuracy, experimental).
+model MultidiseaseScreening {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  scanId       String?
+  scan         Scan?    @relation(fields: [scanId], references: [id])
+  filename     String?
+  cloudUrl     String?
+  topLabel     String
+  topProb      Float
+  probs        Json
+  modelVersion String
+  createdAt    DateTime @default(now())
+
+  screeningReview    ScreeningReview?
+  glaucomaScreenings GlaucomaScreening[]
+
+  @@index([userId])
+}
+
+// Glaucoma specialist deep-dive (plans/plan_glaucoma.txt) -- ANOTHER
+// separate table, not columns on MultidiseaseScreening, for the same reason
+// MultidiseaseScreening itself stays separate from Scan: different model,
+// different confidence caveats (this one requires an internal optic-disc
+// auto-crop step -- plans/plan_glaucoma.txt section 2.1 -- that the 8-way
+// multidisease model doesn't need). multidiseaseScreeningId is optional
+// because this can be triggered two ways: (a) from a multidisease result
+// screen, either the probability-threshold suggestion banner or the
+// "Phân tích chuyên sâu" button inside DiseaseInfoDialog for the glaucoma
+// tile -- both link back here; or (b) run standalone with no prior
+// multidisease screen at all.
+model GlaucomaScreening {
+  id                      String                 @id @default(cuid())
+  userId                  String
+  user                    User                   @relation(fields: [userId], references: [id])
+  multidiseaseScreeningId String?
+  multidiseaseScreening   MultidiseaseScreening? @relation(fields: [multidiseaseScreeningId], references: [id])
+  filename                String?
+  cloudUrl                String?
+  label                   String
+  probGlaucoma            Float
+  opticDiscCenter         Json
+  modelVersion            String
+  createdAt               DateTime               @default(now())
+
+  glaucomaReview GlaucomaReview?
+
+  @@index([userId])
+  @@index([multidiseaseScreeningId])
+}
+
+// Cataract specialist screening (plans/plan_cataract.txt) -- own table, same
+// reasoning as GlaucomaScreening above (a different model, different
+// caveats -- config/cataract/config.json's "known_caveats" -- so it must
+// never look like the same kind of result as Scan.grade or the multidisease
+// baseline). No multidiseaseScreeningId link like GlaucomaScreening has:
+// unlike glaucoma, cataract was never reachable from a multidisease result
+// screen (no "Phân tích chuyên sâu" trigger for the cataract tile) -- this
+// is a standalone screen only, reached directly via /cataract.
+model CataractScreening {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  filename       String?
+  cloudUrl       String?
+  label          String
+  probCataract   Float
+  // Whether inference/cataract_engine.py's best-effort YuNet face detection
+  // actually found a face to crop around -- false means the model ran on
+  // the whole, uncropped photo instead of just the eye, a real accuracy
+  // caveat worth keeping on the row (see CataractResultPanel's own note),
+  // not just in the transient API response.
+  eyeCropApplied Boolean
+  modelVersion   String
+  createdAt      DateTime @default(now())
+
+  cataractReview CataractReview?
+
+  @@index([userId])
+}
+
+// AMD (thoái hóa điểm vàng) specialist screening (plans/plan_AMD.txt) -- own
+// table, same reasoning as GlaucomaScreening/CataractScreening above. No
+// crop-related boolean like CataractScreening's eyeCropApplied and no
+// landmark Json like GlaucomaScreening's opticDiscCenter -- inference/
+// amd_engine.py's own preprocessing (gamma correction + CLAHE) runs
+// unconditionally on every image, nothing to report back about whether a
+// detection step succeeded. This was the one screening feature left
+// running on a client-side fake (lib/amd.ts) after glaucoma and cataract
+// both got real backends -- ServicesSection/OtherModelsNav on the homepage
+// already labeled it "Đang hoạt động" (tone: "live") same as those two, so
+// this table is what makes that claim actually true instead of misleading.
+model AmdScreening {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  filename     String?
+  cloudUrl     String?
+  label        String
+  probAmd      Float
+  modelVersion String
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+}
+
+// "Ghi chú & xác nhận của bác sĩ" (doctor/case/[id]) -- ADDITIVE next to
+// Scan.grade, never a replacement: the doctor's own grade lives here, on its
+// own row, so the AI reading is never overwritten. One row per Scan (scanId
+// is unique) -- a doctor finalizing a case again ("Chỉnh sửa lại") updates
+// this same row rather than creating a new one, since the UI only ever
+// shows one current confirmation per case, not a history of revisions.
+model DoctorReview {
+  id          String   @id @default(cuid())
+  scanId      String   @unique
+  scan        Scan     @relation(fields: [scanId], references: [id])
+  doctorId    String
+  doctor      User     @relation(fields: [doctorId], references: [id])
+  doctorGrade Int
+  note        String?
+  followUp    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([doctorId])
+}
+
+// Doctor-side equivalent of DoctorReview, but for a standalone multi-disease
+// screening (screening-confirmation-form.tsx) -- its own model rather than
+// reusing DoctorReview because the shape is genuinely different: no single
+// 0-4 grade to confirm, so confirmedLabels is a SET of the 8 disease labels
+// (a person can have signs of more than one condition even though the model
+// only ever reports one top label -- see MultidiseaseResultPanel's own
+// caveat copy), and Postgres native array support (String[]) is the natural
+// fit here, unlike DoctorReview's single Int. One row per
+// MultidiseaseScreening (screeningId is unique), same "chỉnh sửa lại updates
+// the same row" behavior as DoctorReview.
+model ScreeningReview {
+  id              String                @id @default(cuid())
+  screeningId     String                @unique
+  screening       MultidiseaseScreening @relation(fields: [screeningId], references: [id])
+  doctorId        String
+  doctor          User                  @relation(fields: [doctorId], references: [id])
+  confirmedLabels String[]
+  recommendation  String
+  note            String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@index([doctorId])
+}
+
+// Doctor-side equivalent of DoctorReview for the glaucoma specialist model --
+// own table, same reasoning as ScreeningReview above (own model, own
+// caveats). Shape is closer to DoctorReview than ScreeningReview: glaucoma's
+// classifier is single-label binary (config/glaucoma/config.json's labels:
+// ["normal","glaucoma"]), not an 8-way set a person could show several of at
+// once, so confirmedLabel is a single String, not an array -- but it's still
+// its own field name/table (not reusing DoctorReview's doctorGrade Int),
+// since "glaucoma" vs "normal" isn't a point on DR's 0-4 ordinal scale.
+model GlaucomaReview {
+  id                  String            @id @default(cuid())
+  glaucomaScreeningId String            @unique
+  glaucomaScreening   GlaucomaScreening @relation(fields: [glaucomaScreeningId], references: [id])
+  doctorId            String
+  doctor              User              @relation(fields: [doctorId], references: [id])
+  confirmedLabel      String
+  note                String?
+  followUp            String
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([doctorId])
+}
+
+// Doctor-side equivalent of DoctorReview for the cataract specialist model --
+// same single-label-binary shape as GlaucomaReview above (config/cataract/
+// config.json's labels: ["normal","cataract"]), own table for the same
+// reason every other screening feature here gets its own review table.
+model CataractReview {
+  id                  String            @id @default(cuid())
+  cataractScreeningId String            @unique
+  cataractScreening   CataractScreening @relation(fields: [cataractScreeningId], references: [id])
+  doctorId            String
+  doctor              User              @relation(fields: [doctorId], references: [id])
+  confirmedLabel      String
+  note                String?
+  followUp            String
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([doctorId])
+}

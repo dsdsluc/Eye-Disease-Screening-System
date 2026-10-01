@@ -1,0 +1,305 @@
+FUNDAS_SYSTEM -- TRAIN PHASE 2 (MULTI-DISEASE ODIR-5K) TREN GOOGLE COLAB
+====================================================
+Ly do chuyen sang Colab: train local (scripts/train_multidisease.py) bi
+buffer output khong thay tien do + 1 tien trinh la vo tinh chay bang Python
+he thong (khong GPU) canh tranh CPU -- xem plans/plan.txt Phase 2. Da huy ca
+2 tien trinh local va xoa data/odir5k_raw/ de giai phong dia (~2GB, xem
+plans/archetechture.txt muc 11 sau khi cap nhat).
+
+Kien truc/logic o day PHAI KHOP CHINH XAC voi inference/multidisease_model.py
++ config/multidisease/config.json cua repo local (ten class, ten attribute
+backbone/classifier, thu tu 8 nhan) de checkpoint tai ve dung thang vao
+models/multidisease/model_best.pth ma khong can sua code.
+
+CHUAN BI TRUOC KHI CHAY:
+  1. Tai kaggle.json (dang dung o C:\Users\ADMIN\.kaggle\kaggle.json local)
+     len Google Drive cua ban, vi du luu tai:
+       /content/drive/MyDrive/kaggle.json
+     (Doi duong dan trong Cell 1 neu ban luu o vi tri khac.)
+  2. Vao Colab (colab.research.google.com), tao notebook moi, chon
+     Runtime > Change runtime type > GPU (T4 la du).
+  3. Copy tung cell duoi day vao 1 o code rieng trong Colab, chay THEO
+     THU TU (Cell 1 -> Cell 7).
+
+
+==================== CELL 1: Mount Drive + cau hinh Kaggle API ====================
+from google.colab import drive
+drive.mount('/content/drive')
+
+import os, shutil
+os.makedirs('/root/.kaggle', exist_ok=True)
+shutil.copy('/content/drive/MyDrive/kaggle.json', '/root/.kaggle/kaggle.json')
+os.chmod('/root/.kaggle/kaggle.json', 0o600)
+print("Kaggle credentials ready.")
+
+
+==================== CELL 2: Cai dependency + tai dataset ODIR-5K ====================
+!pip install -q kaggle timm
+
+import kaggle
+kaggle.api.authenticate()
+kaggle.api.dataset_download_files(
+    'andrewmvd/ocular-disease-recognition-odir5k',
+    path='/content/odir5k_raw',
+    unzip=True,
+    quiet=False,
+)
+print("Dataset downloaded.")
+
+
+==================== CELL 3: Imports + tien xu ly (khop inference/preprocessing.py) ====================
+import ast
+import json
+from pathlib import Path
+
+import cv2
+import numpy as np
+import pandas as pd
+import timm
+import torch
+from torch import nn
+from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
+from PIL import Image
+
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print('Device:', DEVICE)
+
+ROOT = Path('/content/odir5k_raw')
+CSV_PATH = ROOT / 'full_df.csv'
+IMAGE_DIR = ROOT / 'ODIR-5K' / 'ODIR-5K' / 'Training Images'
+
+BACKBONE = 'seresnext50_32x4d'  # phai khop config/multidisease/config.json
+IMAGE_SIZE = 224
+DROPOUT = 0.3
+VAL_FRACTION = 0.15
+SEED = 0
+EPOCHS = 15
+BATCH_SIZE = 32          # Colab GPU thuong khoe hon may local -> tang batch
+LR = 3e-4
+
+LETTER_TO_LABEL = {
+    'N': 'normal', 'D': 'diabetes', 'G': 'glaucoma', 'C': 'cataract',
+    'A': 'amd', 'H': 'hypertension', 'M': 'myopia', 'O': 'other',
+}
+LABELS = list(LETTER_TO_LABEL.values())  # thu tu CO DINH, khop config.json
+
+
+def crop_dark_borders(img: np.ndarray, tol: int = 7) -> np.ndarray:
+    """Y het inference/preprocessing.py::_crop_dark_borders -- crop vien
+    den quanh anh fundus hinh tron."""
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    mask = gray > tol
+    if mask.sum() == 0:
+        return img
+    rows = np.where(mask.any(axis=1))[0]
+    cols = np.where(mask.any(axis=0))[0]
+    cropped = img[rows[0]: rows[-1] + 1, cols[0]: cols[-1] + 1]
+    return cropped if cropped.size else img
+
+
+def load_and_crop(image_path) -> np.ndarray:
+    """Y het inference/preprocessing.py::load_and_crop."""
+    img = cv2.imread(str(image_path))
+    if img is None:
+        raise ValueError(f'Could not read image: {image_path}')
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    return crop_dark_borders(img)
+
+
+_MEAN, _STD = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)  # ImageNet fallback
+try:
+    cfg = timm.get_pretrained_cfg(BACKBONE)
+    if cfg is not None and cfg.mean and cfg.std:
+        _MEAN, _STD = cfg.mean, cfg.std
+except Exception:
+    pass
+
+_TRANSFORM = transforms.Compose([
+    transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=_MEAN, std=_STD),
+])
+
+
+def preprocess(cropped_rgb: np.ndarray) -> torch.Tensor:
+    """Y het inference/preprocessing.py::preprocess_for_backbone cho 1
+    backbone co dinh."""
+    return _TRANSFORM(Image.fromarray(cropped_rgb))
+
+
+==================== CELL 4: Doc nhan tu full_df.csv + chia train/val ====================
+def load_rows():
+    """Y het scripts/train_multidisease.py::_load_rows -- CHU Y dung cot
+    target/labels (PER-EYE) chu KHONG dung cot N/D/G/C/A/H/M/O
+    (patient-level, lech 27% so voi per-eye -- xem plans/plan.txt Phase 2)."""
+    df = pd.read_csv(CSV_PATH)
+    rows, skipped = [], 0
+    for _, row in df.iterrows():
+        letters = ast.literal_eval(row['labels'])
+        if len(letters) != 1 or letters[0] not in LETTER_TO_LABEL:
+            skipped += 1
+            continue
+        filename = row['filename']
+        if not (IMAGE_DIR / filename).exists():
+            skipped += 1
+            continue
+        label_idx = LABELS.index(LETTER_TO_LABEL[letters[0]])
+        rows.append((filename, int(row['ID']), label_idx))
+    print(f'Loaded {len(rows)} rows ({skipped} skipped)')
+    return rows
+
+
+def split_by_patient(rows):
+    rng = np.random.RandomState(SEED)
+    patient_ids = sorted({pid for _, pid, _ in rows})
+    rng.shuffle(patient_ids)
+    n_val = max(1, int(len(patient_ids) * VAL_FRACTION))
+    val_ids = set(patient_ids[:n_val])
+    train_rows = [(fn, label) for fn, pid, label in rows if pid not in val_ids]
+    val_rows = [(fn, label) for fn, pid, label in rows if pid in val_ids]
+    return train_rows, val_rows
+
+
+class ODIRDataset(Dataset):
+    def __init__(self, rows, augment: bool):
+        self.rows = rows
+        self.augment = augment
+
+    def __len__(self):
+        return len(self.rows)
+
+    def __getitem__(self, idx):
+        filename, label_idx = self.rows[idx]
+        cropped = load_and_crop(IMAGE_DIR / filename)
+        if self.augment and np.random.rand() < 0.5:
+            cropped = np.ascontiguousarray(cropped[:, ::-1])
+        return preprocess(cropped), label_idx
+
+
+rows = load_rows()
+train_rows, val_rows = split_by_patient(rows)
+print(f'Train: {len(train_rows)}  Val: {len(val_rows)}')
+
+train_counts = np.bincount([l for _, l in train_rows], minlength=len(LABELS))
+print('Train label counts:', dict(zip(LABELS, train_counts.tolist())))
+class_weights = torch.tensor(
+    train_counts.sum() / (len(LABELS) * np.maximum(train_counts, 1)), dtype=torch.float32
+)
+
+# num_workers>0 an toan tren Colab (khac Windows local) -- tan dung nhieu CPU core hon
+train_loader = DataLoader(ODIRDataset(train_rows, augment=True), batch_size=BATCH_SIZE, shuffle=True, num_workers=2)
+val_loader = DataLoader(ODIRDataset(val_rows, augment=False), batch_size=BATCH_SIZE, shuffle=False, num_workers=2)
+
+
+==================== CELL 5: Model (KHOP inference/multidisease_model.py) ====================
+class MultiDiseaseModel(nn.Module):
+    def __init__(self, backbone_name, num_classes, dropout=0.3):
+        super().__init__()
+        self.backbone = timm.create_model(backbone_name, pretrained=True, num_classes=0)
+        self.classifier = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(self.backbone.num_features, num_classes),
+        )
+
+    def forward(self, x):
+        return self.classifier(self.backbone(x))
+
+
+model = MultiDiseaseModel(BACKBONE, num_classes=len(LABELS), dropout=DROPOUT).to(DEVICE)
+optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+criterion = nn.CrossEntropyLoss(weight=class_weights.to(DEVICE))
+
+
+==================== CELL 6: Vong lap train (khop scripts/train_multidisease.py) ====================
+def macro_f1(confusion: torch.Tensor) -> float:
+    f1s = []
+    for c in range(confusion.shape[0]):
+        tp = confusion[c, c].item()
+        fp = confusion[:, c].sum().item() - tp
+        fn = confusion[c, :].sum().item() - tp
+        precision = tp / (tp + fp) if (tp + fp) else 0.0
+        recall = tp / (tp + fn) if (tp + fn) else 0.0
+        f1s.append(2 * precision * recall / (precision + recall) if (precision + recall) else 0.0)
+    return sum(f1s) / len(f1s)
+
+
+@torch.no_grad()
+def evaluate(model, loader):
+    model.eval()
+    confusion = torch.zeros(len(LABELS), len(LABELS), dtype=torch.int64)
+    correct, total = 0, 0
+    for x, y in loader:
+        x, y = x.to(DEVICE), y.to(DEVICE)
+        preds = model(x).argmax(dim=1)
+        correct += (preds == y).sum().item()
+        total += y.numel()
+        for t, p in zip(y.tolist(), preds.tolist()):
+            confusion[t, p] += 1
+    return correct / total, macro_f1(confusion)
+
+
+best_macro_f1 = -1.0
+best_state = None
+best_metrics = {}
+
+for epoch in range(1, EPOCHS + 1):
+    model.train()
+    running_loss = 0.0
+    for x, y in train_loader:
+        x, y = x.to(DEVICE), y.to(DEVICE)
+        optimizer.zero_grad()
+        loss = criterion(model(x), y)
+        loss.backward()
+        optimizer.step()
+        running_loss += loss.item() * x.size(0)
+
+    train_loss = running_loss / len(train_rows)
+    val_acc, val_macro_f1 = evaluate(model, val_loader)
+    print(f'epoch {epoch:2d}/{EPOCHS}  train_loss={train_loss:.4f}  val_acc={val_acc:.3f}  val_macro_f1={val_macro_f1:.3f}')
+
+    if val_macro_f1 > best_macro_f1:
+        best_macro_f1 = val_macro_f1
+        best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+        best_metrics = {'val_accuracy': val_acc, 'val_macro_f1': val_macro_f1, 'epoch': epoch}
+
+print(f'\nBest: val_macro_f1={best_macro_f1:.3f}  (epoch {best_metrics.get("epoch")})')
+
+
+==================== CELL 7: Luu checkpoint + tai ve may ====================
+CHECKPOINT_NAME = 'model_best.pth'
+torch.save(
+    {'model_state_dict': best_state, 'labels': LABELS, 'backbone': BACKBONE, **best_metrics},
+    CHECKPOINT_NAME,
+)
+
+# Cach 1 (khuyen dung): luu vao Drive de lay lai lau dai
+shutil.copy(CHECKPOINT_NAME, '/content/drive/MyDrive/' + CHECKPOINT_NAME)
+print('Saved to Google Drive:', '/content/drive/MyDrive/' + CHECKPOINT_NAME)
+
+# Cach 2: tai truc tiep ve trinh duyet
+from google.colab import files
+files.download(CHECKPOINT_NAME)
+
+# In san config de copy thu cong ve config/multidisease/config.json (local)
+print(json.dumps({
+    'task': 'Multi-Disease Fundus Screening (ODIR-5K baseline, plans/plan.txt Phase 2)',
+    'dataset_source': 'https://www.kaggle.com/datasets/andrewmvd/ocular-disease-recognition-odir5k',
+    'backbone': BACKBONE,
+    'image_size': IMAGE_SIZE,
+    'dropout': DROPOUT,
+    'labels': LABELS,
+    'checkpoint': CHECKPOINT_NAME,
+    **best_metrics,
+}, indent=4))
+
+
+==================== SAU KHI TAI VE MAY LOCAL ====================
+1. Copy file model_best.pth vua tai ve vao:
+     D:\Fundas_System\models\multidisease\model_best.pth
+2. Copy doan JSON in ra o Cell 7 (da co val_accuracy/val_macro_f1 that) vao:
+     D:\Fundas_System\config\multidisease\config.json
+   (ghi de len ban placeholder hien co)
+3. Chay thu:
+     .venv\Scripts\python -c "from inference.multidisease_model import load_multidisease_model; import torch; m = load_multidisease_model(torch.device('cuda')); print('OK', sum(p.numel() for p in m.parameters()))"
+   de xac nhan checkpoint load dung, khong loi state_dict mismatch.

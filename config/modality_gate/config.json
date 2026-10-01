@@ -1,0 +1,18 @@
+{
+  "clip_model": "ViT-B-32",
+  "clip_pretrained": "openai",
+  "categories": {
+    "fundus": [
+      "a retinal fundus photograph showing the optic disc, macula, and blood vessels, taken with a specialized fundus camera",
+      "a medical retina scan image of the inside of an eye"
+    ],
+    "external_eye": [
+      "a close-up photograph of an external human eye, showing the iris, pupil, sclera, and eyelids, taken with a regular camera",
+      "a photo of a human face focused closely on one eye"
+    ],
+    "other": [
+      "a photograph unrelated to human eyes, such as an animal, object, document, screenshot, or scenery"
+    ]
+  },
+  "notes": "Zero-shot CLIP gate (plans/archetechture.txt 'Van de B'), no training/calibration set -- verified with scripts/test_modality_gate.py on test_images/ (10/10 fundus), cataract_test/ (8/8 external_eye), and a handful of non-eye images (3/3 other). Argmax over the 3 categories, no separate confidence threshold: 'other' already acts as the reject bucket, so a low-confidence real fundus photo still needs to beat 'other' and 'external_eye' to pass, not clear some absolute score."
+}

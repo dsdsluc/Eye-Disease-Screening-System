@@ -1,0 +1,267 @@
+FUNDAS_SYSTEM -- AUDIT TANG FASTAPI + HUONG NANG CAP PERFORMANCE/LATENCY
+(2026-09-02)
+====================================================
+Ghi lai audit thuc te (khong doan, da chay lenh that qua HTTP) cho inference/
+(FastAPI, 6 engine: DR ensemble, quality, multidisease, glaucoma, AMD,
+cataract) va de xuat huong nang cap performance/latency. File nay truoc do
+la tai lieu kien truc chi tiet (nhieu muc duoc cac file khac tham chieu:
+2.3, 6, 7, 7.2, 8, 9, 10, 11) nhung da bi xoa/reset -- viet lai tu dau, tap
+trung vao yeu cau audit + performance lan nay, chua khoi phuc lai toan bo
+noi dung cu.
+
+
+1. KIEN TRUC HIEN TAI (tom tat nhanh, de audit muc 2 co ngu canh)
+----------------------------------------------------------
+1 process FastAPI duy nhat (inference/main.py), 6 engine deu duoc load 1
+lan trong lifespan (asyncio.gather, song song) va giu resident trong VRAM
+suot vong doi process:
+    /predict, /explain      -> InferenceEngine (DR, 20 model: 4 backbone x
+                               5 fold, vmap-batched-forward, fp16)
+    /quality-check          -> QualityEngine (QuickQual, DenseNet121 dong
+                               bang + SVM sklearn)
+    /multidisease-screen    -> MultiDiseaseEngine (1 backbone, 8-lop)
+    /glaucoma-screen        -> GlaucomaEngine (1 backbone nhi phan + model
+                               dinh vi dia thi giac rieng cua fundus_image_
+                               toolbox)
+    /amd-screen             -> AmdEngine (1 backbone nhi phan + Gamma/CLAHE)
+    /cataract-screen        -> CataractEngine (1 backbone nhi phan + YuNet
+                               face detector cv2.FaceDetectorYN cho auto-
+                               crop mat, KHONG dung fundus preprocessing)
+
+VRAM da do thuc te (6 engine cung luc): ~4.3-4.4GB / 8.15GB -- con du.
+
+
+2. KET QUA AUDIT THUC TE (da chay lenh that, khong doan)
+----------------------------------------------------------
+2.1 [NGHIEM TRONG, CHUA XAC DINH DUOC NGUYEN NHAN CHINH XAC] Ghi nhan 1
+    LAN SERVER SAP HOAN TOAN khi nhan 1 file khong phai anh that (noi dung
+    van ban thuong, doi ten .jpg) gui vao /predict -- port 8000 ngung
+    listen hoan toan, KHONG CO Python traceback nao trong log (khac han
+    hanh vi binh thuong cua 1 exception Python duoc FastAPI bat va tra ve
+    500) -- day la dau hieu CRASH O TANG NATIVE (C++/CUDA/ONNX), khong
+    phai loi Python thong thuong.
+    DA THU TAI HIEN LAI: 9 lan thu tiep theo (file van ban gia lam .jpg,
+    file rong 0 byte, file JPEG that bi cat cut giua chung) tren CA 6
+    endpoint deu KHONG crash lai -- tat ca deu tra ve 500 sach se, server
+    song. => Day la loi FLAKY/HIEM GAP, khong tat dinh, CHUA khoanh vung
+    duoc chinh xac module nao gay ra. Nghi ngo hang dau (chua xac nhan):
+    cv2.FaceDetectorYN (dung cho auto-crop cua cataract, them gan day nhat)
+    -- log server co in canh bao rieng tu chinh OpenCV luc khoi dong dung
+    model nay: "Targets are not supported by the new graph engine for
+    now", cho thay backend DNN moi cua opencv-python 5.0.0 (dung trong du
+    an nay) TU NHAN la chua on dinh hoan toan.
+    KHUYEN NGHI: theo doi tiep, KHONG the coi la "da sua" chi vi khong tai
+    hien duoc -- xem de xuat giam sat o muc 3.4.
+
+2.2 [XAC NHAN CHAC CHAN, LAP LAI DUOC 100%] KHONG CO XU LY LOI RO RANG cho
+    input hong/khong phai anh -- moi 6 endpoint deu tra ve "Internal Server
+    Error" (500) CHUNG CHUNG, khong co JSON body co cau truc, khong co
+    thong bao huu ich cho client (vd web/) biet "anh khong doc duoc" khac
+    voi "loi he thong that su". Nguyen nhan: khong endpoint nao trong
+    inference/main.py boc try/except quanh loi goi engine.predict() --
+    load_and_crop (hoac tuong duong tung engine) nem ValueError khi
+    cv2.imread() tra ve None, FastAPI roi vao handler 500 mac dinh.
+    Day la lo hong da tung duoc nhac toi giu (cau hoi "co model nao bao ve
+    dam bao anh upload dung la fundus khong" -- CHUA co, va phat hien nay
+    cho thay ngay ca xu ly loi CO BAN cho "anh khong doc duoc" cung dang
+    thieu, chua noi den phat hien sai modality/OOD).
+
+2.3 [NHO, CHUA KIEM CHUNG] _save_upload_to_temp() goi Path(file.filename)
+    -- neu client gui multipart khong kem filename (hop le theo spec HTTP,
+    mot so thu vien client khong luon dat ten file), day se nem
+    AttributeError/TypeError truoc ca buoc kiem tra duoi file, roi vao
+    cung 1 loai 500 chung chung nhu muc 2.2.
+
+2.4 [TICH CUC] Do latency THAT tren may hien tai (anh fundus that, 1 lan
+    goi/endpoint sau khi da warm):
+        /predict            1.51s   (20 model, ensemble)
+        /explain            1.97s   (Grad-CAM, ensemble + backward)
+        /quality-check      0.25s
+        /multidisease-screen 0.23s
+        /glaucoma-screen    0.31s   (co them buoc dinh vi dia thi giac)
+        /amd-screen         0.29s
+        /cataract-screen    0.09s
+    4 request /predict GUI DONG THOI: moi request ~0.79-0.93s (nhanh HON
+    ca luc goi tuan tu 1.51s -- kha nang do warm-up bo nho dem/CUDA kernel,
+    khong phai bang chung song song that su) -- KHONG thay dau hieu serial-
+    hoa/nghen o quy mo 4 request dong thoi. Diem sang: asyncio.to_thread
+    dang lam viec hop ly o quy mo nho, chua can sua ngay.
+
+
+3. DE XUAT HUONG NANG CAP PERFORMANCE/LATENCY
+----------------------------------------------------------
+3.1 UU TIEN CAO: boc try/except quanh MOI cuoc goi engine.predict() trong
+    inference/main.py, tra ve HTTPException(400, "Khong doc duoc anh, vui
+    long kiem tra dinh dang file") thay vi de rot xuong 500 mac dinh. Day
+    KHONG phai toi uu latency, nhung la "on dinh" (audit yeu cau ca 2) --
+    ưu tiên truoc performance vi anh hung truc tiep den trai nghiem loi
+    that (web/ dang nhan 500 vo nghia thay vi thong bao huu ich).
+
+3.2 GIAM LATENCY -- /explain (Grad-CAM, 1.97s, cham nhat):
+    Grad-CAM hien chay lai TOAN BO 4 backbone (forward + backward) rieng
+    biet voi /predict -- neu web/ luon goi ca 2 (/predict roi /explain) cho
+    cung 1 anh, co the gop thanh 1 endpoint tra ca grade LAN heatmap trong
+    1 lan tien xu ly + 1 lan forward (backward chi them cho phan CAM), tiet
+    kiem duoc 1 lan tien xu ly anh + 1 lan forward DR full (~0.7-0.8s uoc
+    tinh dua tren chenh lech do duoc voi /predict). Can xac nhan truoc voi
+    web/ xem 2 endpoint co luon di cung nhau khong roi moi gop.
+
+3.3 GIAM VRAM/thoi gian khoi dong -- LAZY-LOAD cho cac engine it dung:
+    Ca 6 model deu load NGAY LUC KHOI DONG (kien truc "always warm" hop ly
+    cho DR vi la tinh nang chinh, dung lien tuc) -- nhung glaucoma/AMD/
+    cataract la tinh nang PHU, nguoi dung chu dong kich hoat, tan suat goi
+    thap hon nhieu so /predict. Co the doi sang tai LUOI (load lan dau tien
+    goi den, cache lai cho cac lan sau) cho 3 engine nay -- danh doi: lan
+    goi DAU TIEN cua moi engine se cham hon (them thoi gian load model), bu
+    lai giam VRAM/thoi gian khoi dong tong the va it tai nguyen hon cho
+    engine it dung. CAN CAN NHAC: hien VRAM con du (4.3/8.15GB), day la toi
+    uu "phong ngua" hon la "can gap" luc nay -- uu tien thap hon 3.1/3.2.
+
+3.4 GIAM SAT thay vi "sua ngay" cho muc 2.1 (crash flaky):
+    Vi khong tai hien duoc on dinh, de xuat: (a) bat log co cau truc hon
+    cho tung request (vd ghi lai ten file/kich thuoc truoc khi xu ly) de
+    neu crash lai xay ra co du lieu dieu tra thay vi mat trang hoan toan
+    nhu lan nay; (b) can nhac chay uvicorn voi tien trinh giam sat tu khoi
+    dong lai (vd --reload khong hop cho production, nhung 1 process manager
+    ben ngoai nhu supervisor/pm2/systemd voi auto-restart-on-crash se giam
+    thiet hai neu loi flaky nay tai dien that trong luc dung thuc te) --
+    hien tai neu server sap, TOAN BO 6 tinh nang (ke ca DR chinh) deu mat
+    cho toi khi co nguoi thu cong khoi dong lai.
+
+3.5 (Lien quan cau hoi da thao luan truoc, chua lam) Gatekeeper kiem tra
+    modality dau vao (vd CLIP zero-shot, da thao luan o 1 phien truoc) --
+    NEU lam, se giai quyet duoc 1 phan nguyen nhan goc cua muc 2.2/2.3 (chan
+    somewhat tu xa cac input ro rang sai dinh dang truoc khi cham vao
+    engine.predict() that), khong chi la xu ly loi tot hon o tang sau.
+
+
+4. UU TIEN DE XUAT (theo thu tu lam)
+----------------------------------------------------------
+    (1) Muc 3.1 -- try/except co cau truc, chi phi thap, loi ich lon nhat
+        cho ca on dinh LAN trai nghiem loi.
+    (2) Muc 2.3 -- sua kem theo cung luc voi (1) (kiem tra file.filename
+        truoc khi goi Path()).
+    (3) Muc 3.2 -- gop /predict + /explain NEU xac nhan voi web/ la luon
+        goi cung nhau.
+    (4) Muc 3.4 -- them log request-level, can nhac process manager co
+        auto-restart.
+    (5) Muc 3.3 -- lazy-load cho glaucoma/AMD/cataract (uu tien thap, VRAM
+        chua phai van de cap bach).
+    (6) Muc 3.5 -- gatekeeper modality (da co ke hoach so bo tu truoc, chua
+        trien khai).
+
+CHUA LAM GI TRONG PHIEN NAY NGOAI AUDIT + DO DAC -- cho nguoi dung chon
+huong truoc khi code.
+
+
+5. DA LAM (2026-09-03): MUC 3.1 + 2.3 -- XU LY LOI "VAN DE A" (file hong ky
+   thuat), phan biet voi "van de B" (sai modality, nguoi dung se chot huong
+   rieng sau)
+----------------------------------------------------------
+inference/main.py:
+  - Them ham dung chung _run_engine(fn, *args): boc asyncio.to_thread(fn,
+    *args) trong try/except, MOI exception (ValueError tu load_and_crop/
+    _load_rgb khi anh khong doc duoc, hoac bat ky loi nao khac trong luc
+    xu ly) deu bi bat, GHI LOG DAY DU TRACEBACK o server (logger.exception,
+    khong im lang bo qua), roi tra ve HTTPException(400, thong bao tieng
+    Viet ro rang) thay vi de FastAPI roi vao 500 rong mac dinh.
+  - Ap dung _run_engine cho CA 7 lenh goi engine trong 7 endpoint (predict,
+    explain, quality-check, multidisease-screen, glaucoma-screen,
+    amd-screen, cataract-screen) -- khong con endpoint nao thieu xu ly loi.
+  - _save_upload_to_temp(): them kiem tra `if not file.filename` TRUOC khi
+    goi Path(file.filename) -- sua edge case muc 2.3 (client khong gui
+    filename se khong con crash o buoc nay).
+
+DA KIEM CHUNG THAT (khong chi doc code):
+  - Gui lai dung file van ban gia .jpg va file rong (0 byte) vao CA 6
+    endpoint model -- TAT CA deu tra ve 400 + JSON body ro rang
+    ({"detail": "Khong the xu ly anh nay..."}), server SONG sau moi lan.
+  - Kiem tra log server: xac nhan co in DAY DU traceback that (vd
+    "ValueError: Could not read image: ...") truoc khi tra 400 -- neu sau
+    nay can dieu tra tiep, thong tin nay co san, khong con "mat trang"
+    nhu truoc.
+  - Test lai 2 request HOP LE (mot anh DR that qua /predict, mot anh
+    cataract that qua /cataract-screen) -- ket qua GIONG HET truoc khi sua,
+    xac nhan fix khong lam thay doi hanh vi dung.
+
+CHUA GIAI QUYET (ngoai pham vi "van de A", thuoc "van de B" -- nguoi dung
+se chot huong sau, xem muc 3.5/cuoc thao luan rieng ve gatekeeper modality
+CLIP): _run_engine chi bat duoc loi Python -- KHONG bao ve duoc truoc crash
+o tang native (muc 2.1, chua tai hien lai duoc) vi try/except Python khong
+the bat duoc segfault-kieu native.
+
+
+6. DA LAM (2026-09-03): MUC 3.5 -- "VAN DE B" (sai modality) -- CLIP
+   zero-shot gatekeeper, dat NGOAI CUNG truoc quality-check
+----------------------------------------------------------
+Quyet dinh cua nguoi dung (khong tu suy dien): huong CLIP zero-shot (khong
+train), dat lam lop ngoai cung cho CA 7 endpoint; giu nguyen quality-check
+(khong xoa, van dung rieng cho web/); chan CUNG (hard block, KHONG can
+"canh bao mem" vi he thong con dang dev, chua public) -- chi can bao ro
+trong response/log la du. Sau do nguoi dung yeu cau them: quality-check
+cung phai duoc nhung (chain) vao CA 5 endpoint fundus con lai (predict,
+explain, multidisease-screen, glaucoma-screen, amd-screen), vi cac model do
+deu dung fundus va quality-check "ho tro cho fundus".
+
+File moi:
+  - config/modality_gate/config.json: prompt CLIP cho 3 nhom {fundus,
+    external_eye, other} ("other" la nhom "rac" -- lam nen de fundus/
+    external_eye phai THANG no moi duoc coi la dung, khong can nguong
+    tuyet doi).
+  - inference/modality_gate.py (class ModalityGate): tai open_clip
+    ViT-B-32/openai (khong finetune), encode text prompt 1 lan luc load,
+    method .check(image_path, expected) tra ve {passed, expected,
+    predicted, scores}; log logger.warning() moi lan reject (dung "bao
+    voi toi" thay vi tra ve field canh bao khong chan).
+  - scripts/test_modality_gate.py: script kiem chung rieng TRUOC khi noi
+    vao main.py -- da chay tren du lieu that: test_images/ (10/10 dung la
+    fundus), cataract_test/ (8/8 dung la external_eye), 3 anh khong lien
+    quan mat (quokka.jpg + 2 icon matplotlib, 3/3 dung la "other").
+
+inference/main.py:
+  - Them modality_gate vao lifespan (engine thu 7, load song song voi 6
+    engine con lai qua asyncio.gather nhu cu).
+  - Ham _check_fundus(tmp_path): goi ModalityGate.check(expected="fundus")
+    -> raise HTTPException(422, ...) neu sai modality; NEU DUNG thi goi
+    tiep quality_engine.check(tmp_path, "fail_closed") (chain, khong phai
+    goi song song tu web/ nua) -> raise HTTPException(422, ...) neu
+    blocked=True. Dung cho predict/explain/multidisease-screen/
+    glaucoma-screen/amd-screen.
+  - Ham _check_external_eye(tmp_path): giong tren nhung expected=
+    "external_eye", KHONG chain quality-check (QuickQual train tren fundus,
+    khong noi gi duoc ve anh mat ngoai). Dung cho cataract-screen.
+  - /quality-check: van giu gate_mode configurable qua query param nhu cu
+    (web/ goi voi fail_open, khong doi hanh vi cu) -- CHI them CLIP gate
+    (expected="fundus") truoc khi vao quality_engine.check(), vi ban than
+    quality-check cung la model fundus-only nen cung phai nam sau lop
+    ngoai cung nay.
+  - VRAM: 4.3-4.4GB -> 5.1GB sau khi them CLIP (con du cho card 8.15GB).
+
+DA KIEM CHUNG THAT (khong chi doc code, restart server + curl that):
+  - Anh fundus that (chat luong tot, quality label="good") qua CA 5
+    endpoint fundus (predict/explain/multidisease-screen/glaucoma-screen/
+    amd-screen) -> 200, ket qua dung nhu truoc.
+  - Anh fundus that nhung quality label="reject" (that, khong dan) qua
+    /predict -> 422 dung nhu thiet ke (quality-check embedded chan no,
+    KHONG phai loi) -- xac nhan qua /quality-check?gate_mode=fail_closed
+    tra ve blocked=true cung anh do.
+  - Anh cataract that qua /cataract-screen -> 200 dung nhu truoc.
+  - Anh cataract (external_eye) gui vao /predict -> 422, message neu ro
+    "co ve giong: external_eye".
+  - Anh fundus gui vao /cataract-screen -> 422, message neu ro "co ve
+    giong: fundus".
+  - Anh khong lien quan mat (quokka.jpg) gui vao /predict -> 422, message
+    neu ro "co ve giong: other".
+  - File van ban gia .jpg va file rong -- VAN tra ve 400 nhu "van de A"
+    (khong bi lop CLIP gate nuot mat, PIL.Image.open() loi duoc _run_engine
+    bat va chuyen thanh 400 dung nhu thiet ke cu).
+  - Do latency: /predict am (CLIP + quality + model, warm) ~0.7-1.2s, khong
+    tang dang ke so voi truoc (~1.51s theo muc 2.4); /cataract-screen (CLIP
+    + model) ~0.05-0.07s.
+
+CHUA CALIBRATE (ghi nhan trung thuc, khong claim hoan hao): nguong quyet
+dinh cua CLIP gate la argmax thuan tuy tren 3 nhom, KHONG co bo du lieu
+nhan tay de do false-positive-rate/false-negative-rate that su -- da kiem
+chung tren mot bo anh nho, that, nhung chua phai validation set chinh
+thuc. Neu sau nay gap truong hop that (nguoi dung bao anh fundus that bi
+chan oan) thi can xem lai prompt/nguong, khong phai lam lai tu dau.
